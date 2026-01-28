@@ -1,0 +1,145 @@
+/* CentralAjuda.css */
+.central-ajuda {
+  background-color: #fff;
+  border-radius: 8px;
+  padding: 2rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  margin-top: 2rem;
+}
+
+.search-box {
+  position: relative;
+  margin-bottom: 2rem;
+}
+
+.search-box input {
+  width: 100%;
+  padding: 0.75rem 1rem 0.75rem 2.5rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 1rem;
+}
+
+.search-box svg {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.help-categories {
+  margin-bottom: 2rem;
+}
+
+.category-card {
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  overflow: hidden;
+}
+
+.category-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background-color: #f8f9fa;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.category-header:hover {
+  background-color: #e9ecef;
+}
+
+.category-header h2 {
+  color: #2c3e50;
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+.category-header svg {
+  transition: transform 0.3s;
+}
+
+.category-header svg.active {
+  transform: rotate(180deg);
+}
+
+.questions-list {
+  padding: 0 1rem;
+}
+
+.question-item {
+  padding: 1rem 0;
+  border-bottom: 1px solid #eee;
+}
+
+.question-item:last-child {
+  border-bottom: none;
+}
+
+.question-item h3 {
+  color: #3498db;
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.question-item p {
+  color: #34495e;
+  line-height: 1.5;
+}
+
+.no-results {
+  text-align: center;
+  padding: 2rem;
+  color: #7f8c8d;
+}
+
+.no-results p {
+  margin-bottom: 1rem;
+}
+
+.contact-link {
+  color: #3498db;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.contact-link:hover {
+  text-decoration: underline;
+}
+
+.additional-help {
+  text-align: center;
+  padding: 1.5rem;
+  background-color: #f1f8fe;
+  border-radius: 6px;
+  border-left: 4px solid #3498db;
+}
+
+.additional-help h2 {
+  color: #2c3e50;
+  font-size: 1.2rem;
+  margin-bottom: 1rem;
+}
+
+.help-button {
+  display: inline-block;
+  background-color: #3498db;
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 4px;
+  text-decoration: none;
+  margin-bottom: 1rem;
+  transition: background-color 0.3s;
+}
+
+.help-button:hover {
+  background-color: #2980b9;
+}
+
+.additional-help p {
+  color: #7f8c8d;
+  font-size: 0.9rem;
+}

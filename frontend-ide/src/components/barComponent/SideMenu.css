@@ -1,0 +1,40 @@
+.side-menu {
+    position: fixed;
+    top: 0;
+    left: -250px;
+    width: 250px;
+    height: 100%;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    box-shadow: 2px 0 5px rgba(0, 0, 0, 0.5);
+    transition: left 0.3s ease;
+    z-index: 1000;
+  }
+  
+  .side-menu.open {
+    left: 0;
+  }
+  
+  .side-menu button {
+    display: block;
+    margin: 10px auto;
+    background-color: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--text-color);
+  }
+  
+  .side-menu nav ul {
+    list-style: none;
+    padding: 0;
+  }
+  
+  .side-menu nav ul li {
+    margin: 20px 0;
+  }
+  
+  .side-menu nav ul li a {
+    text-decoration: none;
+    color: var(--text-color);
+  }
+  

@@ -1,0 +1,42 @@
+/* PoliticaPrivacidade.css */
+.politica-privacidade {
+  background-color: #fff;
+  border-radius: 8px;
+  padding: 2rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  margin-top: 2rem;
+}
+
+.politica-item {
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid #eee;
+}
+
+.politica-item:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.politica-item h2 {
+  color: #2c3e50;
+  font-size: 1.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.politica-item p {
+  color: #34495e;
+  line-height: 1.6;
+  margin-bottom: 0.5rem;
+}
+
+.politica-item ul {
+  padding-left: 1.5rem;
+  margin: 0.5rem 0;
+}
+
+.politica-item li {
+  margin-bottom: 0.25rem;
+  color: #34495e;
+}

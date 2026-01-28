@@ -1,0 +1,76 @@
+/* SobreSistema.css */
+.sobre-sistema {
+  background-color: #fff;
+  border-radius: 8px;
+  padding: 2rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  margin-top: 2rem;
+}
+
+.sobre-item {
+  margin-bottom: 2.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid #eee;
+}
+
+.sobre-item:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.sobre-item h2 {
+  color: #2c3e50;
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+  border-left: 4px solid #3498db;
+  padding-left: 0.75rem;
+}
+
+.sobre-item p {
+  color: #34495e;
+  line-height: 1.6;
+  margin-bottom: 1rem;
+}
+
+.sobre-item ul {
+  padding-left: 1.5rem;
+  margin: 1rem 0;
+}
+
+.sobre-item li {
+  margin-bottom: 0.5rem;
+  color: #34495e;
+}
+
+.tecnologias-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+
+.tecnologia-card {
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  padding: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.tecnologia-card h3 {
+  color: #2980b9;
+  margin-bottom: 0.75rem;
+  font-size: 1.1rem;
+}
+
+.versao-info {
+  background-color: #f1f8fe;
+  border-left: 4px solid #3498db;
+  padding: 1rem;
+  border-radius: 0 4px 4px 0;
+}
+
+.versao-info p {
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}

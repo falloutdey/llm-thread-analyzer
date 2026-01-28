@@ -1,0 +1,135 @@
+/* Estilos para a página inicial */
+.hero-section {
+  background: linear-gradient(135deg, #1e5799 0%, #207cca 100%);
+  color: white;
+  padding: 4rem 2rem;
+  border-radius: 8px;
+  margin: 2rem 0;
+  text-align: center;
+}
+
+.hero-content h1 {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+}
+
+.hero-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.primary-btn {
+  background-color: #4CAF50;
+  color: white;
+  padding: 0.8rem 1.5rem;
+  border-radius: 4px;
+  text-decoration: none;
+  font-weight: 500;
+  transition: background-color 0.3s;
+}
+
+.primary-btn:hover {
+  background-color: #3e8e41;
+}
+
+.primary-btn.large {
+  padding: 1rem 2rem;
+  font-size: 1.1rem;
+}
+
+.secondary-btn {
+  background-color: transparent;
+  color: white;
+  padding: 0.8rem 1.5rem;
+  border: 2px solid white;
+  border-radius: 4px;
+  text-decoration: none;
+  font-weight: 500;
+  transition: all 0.3s;
+}
+
+.secondary-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.login-btn, .register-btn {
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  text-decoration: none;
+  font-weight: 500;
+  margin-left: 0.5rem;
+}
+
+.login-btn {
+  color: #333;
+  border: 1px solid #ddd;
+}
+
+.register-btn {
+  background-color: #2196F3;
+  color: white;
+}
+
+.section-description {
+  color: #666;
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.frameworks-section, .features-section {
+  margin: 4rem 0;
+  text-align: center;
+}
+
+.frameworks-grid, .features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+  margin-top: 2rem;
+}
+
+.framework-card, .feature-card {
+  background: white;
+  padding: 2rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s, box-shadow 0.3s;
+  text-align: center;
+}
+
+.framework-card:hover, .feature-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.framework-card h3, .feature-card h3 {
+  color: #2c3e50;
+  margin: 1rem 0;
+}
+
+.card-icon {
+  font-size: 2.5rem;
+  display: block;
+  margin-bottom: 1rem;
+}
+
+.cta-section {
+  background-color: #f5f5f5;
+  padding: 3rem;
+  border-radius: 8px;
+  text-align: center;
+  margin: 4rem 0;
+}
+
+.cta-content h2 {
+  color: #2c3e50;
+  margin-bottom: 1rem;
+}
+
+.cta-content p {
+  color: #666;
+  max-width: 600px;
+  margin: 0 auto 2rem;
+}

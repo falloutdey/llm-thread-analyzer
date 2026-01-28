@@ -1,0 +1,24 @@
+.paragrafo {
+  justify-items: center;
+  align-items: center;
+}
+
+.icons-container {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  display: flex;
+  gap: 10px; /* Espaço entre os ícones */
+}
+
+.icon-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.5em; /* Ajuste o tamanho dos ícones conforme necessário */
+}
+
+.icon-button:hover {
+  color: #555; /* Cor ao passar o mouse sobre o ícone */
+}

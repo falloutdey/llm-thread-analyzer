@@ -1,0 +1,4 @@
+@font-face {
+    font-family: 'MinhaFonte';
+    src: local('MinhaFonte'), url('./fonts/Pixelify_Sans/PixelifySans-VariableFont_wght.ttf') format('woff');
+  }

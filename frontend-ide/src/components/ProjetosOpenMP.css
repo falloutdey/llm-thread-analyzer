@@ -1,0 +1,168 @@
+/* Estilos para a listagem de projetos */
+.projects-section {
+    margin-top: 2rem;
+}
+
+.new-project-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background-color: #4CAF50;
+    color: white;
+    padding: 0.8rem 1.5rem;
+    border-radius: 4px;
+    text-decoration: none;
+    margin-top: 1rem;
+    transition: background-color 0.3s;
+}
+
+.new-project-button:hover {
+    background-color: #3e8e41;
+}
+
+.empty-projects {
+    text-align: center;
+    padding: 2rem;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.create-project-link {
+    color: #4CAF50;
+    font-weight: 500;
+    text-decoration: none;
+}
+
+.create-project-link:hover {
+    text-decoration: underline;
+}
+
+.projects-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+}
+
+.project-card {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    padding: 1.5rem;
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.project-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.project-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+}
+
+.project-header h3 {
+    margin: 0;
+    color: #2c3e50;
+    cursor: pointer;
+    flex-grow: 1;
+}
+
+.project-header input {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-family: inherit;
+}
+
+.project-badge {
+    background-color: #e3f2fd;
+    color: #1976d2;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.project-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.action-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background-color 0.3s;
+}
+
+.action-button.open {
+    background-color: #2196F3;
+    color: white;
+}
+
+.action-button.edit {
+    background-color: #FFC107;
+    color: #212121;
+}
+
+.action-button.delete {
+    background-color: #f44336;
+    color: white;
+}
+
+.action-button.save {
+    background-color: #4CAF50;
+    color: white;
+}
+
+.action-button.cancel {
+    background-color: #9E9E9E;
+    color: white;
+}
+
+.delete-confirmation {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.delete-confirmation p {
+    margin: 0;
+    font-size: 0.9rem;
+}
+
+.confirm-button {
+    background-color: #f44336;
+    color: white;
+    border: none;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.cancel-button {
+    background-color: #9E9E9E;
+    color: white;
+    border: none;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.loading-message {
+    text-align: center;
+    padding: 2rem;
+    color: #7f8c8d;
+}
