@@ -158,7 +158,7 @@ const MeuEditor = ({ idArquivo, atualizarCaminho }) => {
   const handleSave = async () => {
     try {
       if (caminhoArquivo) {
-        await axios.put(`http://localhost:5000/api/files/arquivos/conteudo`, {
+        await axios.put(`http://localhost:8080/api/files/arquivos/conteudo`, {
           caminho: caminhoArquivo,
           conteudo: conteudoArquivo,
         });

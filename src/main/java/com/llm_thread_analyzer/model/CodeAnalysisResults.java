@@ -4,9 +4,9 @@ import java.util.ArrayList;
 
 public class CodeAnalysisResults {
 
-    private List<ConcurrencyIssue> issues = new ArrayList<>();
+    // private List<ConcurrencyIssue> issues = new ArrayList<>();
 
-    public boolean hasIssues() {
-        return !issues.isEmpty();
-    }
+    // public boolean hasIssues() {
+    //     return !issues.isEmpty();
+    // }
 }
