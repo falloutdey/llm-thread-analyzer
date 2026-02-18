@@ -8,8 +8,8 @@ import com.llm_thread_analyzer.model.SourceCode;
 public class CodeAnalysisService {
 
     public void testarConexao() {
-        System.out.println("Caminho recebido: " + SourceCode.getCaminho());
-        System.out.println("Conteúdo: " + (SourceCode.getConteudo() != null ? SourceCode.getConteudo() : "Vazio"));
+        System.out.println("Caminho recebido: " + SourceCode.getPath());
+        System.out.println("Conteúdo: " + (SourceCode.getContent() != null ? SourceCode.getContent() : "Vazio"));
     }
 
 }

@@ -2,23 +2,23 @@ package com.llm_thread_analyzer.model;
 
 public class SourceCode {
 
-    private static String caminho;
-    private static String conteudo;
+    private static String path;
+    private static String content;
 
-    public static String getCaminho() {
-        return caminho;
+    public static String getPath() {
+        return path;
     }
 
-    public void setCaminho(String caminho) {
-        this.caminho = caminho;
+    public void setPath(String path) {
+        this.path = path;
     }
 
-    public static String getConteudo() {
-        return conteudo;
+    public static String getContent() {
+        return content;
     }
 
-    public void setConteudo(String conteudo) {
-        this.conteudo = conteudo;
+    public void setContent(String content) {
+        this.content = content;
     }
 
 }
