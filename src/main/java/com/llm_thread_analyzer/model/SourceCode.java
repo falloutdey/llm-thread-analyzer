@@ -1,24 +1,30 @@
 package com.llm_thread_analyzer.model;
 
 public class SourceCode {
+    private String fileName;
+    private String content;
 
-    private static String path;
-    private static String content;
+    // Construtor vazio (obrigatório para o Spring)
+    public SourceCode() {}
 
-    public static String getPath() {
-        return path;
+    public SourceCode(String fileName, String content) {
+        this.fileName = fileName;
+        this.content = content;
     }
 
-    public void setPath(String path) {
-        this.path = path;
+    public String getFileName() {
+        return fileName;
     }
 
-    public static String getContent() {
+    public void setFileName(String fileName) {
+        this.fileName = fileName;
+    }
+
+    public String getContent() {
         return content;
     }
 
     public void setContent(String content) {
         this.content = content;
     }
-
 }

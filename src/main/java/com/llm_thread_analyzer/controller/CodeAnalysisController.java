@@ -16,13 +16,13 @@ import com.llm_thread_analyzer.service.CodeAnalysisService;
 @CrossOrigin(origins = "*")
 public class CodeAnalysisController {
     
-    @Autowired
-    private CodeAnalysisService codeAnalysisService;
+    // @Autowired
+    // private CodeAnalysisService codeAnalysisService;
 
-    @PutMapping("/arquivos/conteudo")
-    public ResponseEntity<String> receberCodigoTeste(@RequestBody SourceCode sourceCode) {
-        codeAnalysisService.testarConexao();
-        return ResponseEntity.ok("Código Recebido com sucesso");
-    }
+    // @PutMapping("/arquivos/conteudo")
+    // public ResponseEntity<String> receberCodigoTeste(@RequestBody SourceCode sourceCode) {
+    //     codeAnalysisService.testarConexao();
+    //     return ResponseEntity.ok("Código Recebido com sucesso");
+    // }
 
 }

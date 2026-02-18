@@ -7,10 +7,12 @@ public class ConcurrencyIssue {
     private String message;
     private String interpretation;
 
+    public ConcurrencyIssue() {}
+
     public ConcurrencyIssue(String type, int lineNumber, String message) {
         this.type = type;
-        this.message = message;
         this.lineNumber = lineNumber;
+        this.message = message;
     }
 
     public String getType() {
