@@ -52,38 +52,47 @@ const CompileResult = ({ compilationResult }) => {
         <Box
           p={2}
           style={{
-            maxHeight: '280px', // Defina a altura máxima da caixa
-            overflowY: 'auto', // Ativa a barra de rolagem vertical se necessário
-            border: '1px solid #ccc', // Opcional: adiciona uma borda para visualização
-            borderRadius: '4px', // Opcional: arredonda os cantos da borda
+            maxHeight: '280px',
+            overflowY: 'auto',
+            border: '1px solid #ccc',
+            borderRadius: '4px',
             marginTop: '-20px',
             borderColor: '#253342',
-            backgroundColor: '#253342', // Opcional: cor de fundo para a caixa
+            backgroundColor: '#253342',
             color: '#ffffff'
           }}
         >
-          <Typography variant="body1" color={compilationResult.error ? 'error' : 'textPrimary'} style={{ color: compilationResult.error ? undefined : '#ffffff' }}>
-            {compilationResult.error ? compilationResult.error : 'Compilação e execução bem-sucedidas!'}
-          </Typography>
-          {compilationResult.stdout && (
-            <Box mt={1}>
-              <Typography variant="body2" color="#ffffff">
-                Saída da Execução:
+          {compilationResult.error ? (
+            <Typography variant="body1" style={{ color: '#ef4444' }}>
+              {compilationResult.error}
+            </Typography>
+          ) : (
+            <>
+              <Typography variant="h6" style={{ color: '#ffffff', marginBottom: '10px' }}>
+                Feedback da Análise de Threads:
               </Typography>
-              <Typography variant="body2" component="pre">
-                {compilationResult.stdout}
-              </Typography>
-            </Box>
-          )}
-          {compilationResult.stderr && (
-            <Box mt={1}>
-              <Typography variant="body2" color="textSecondary">
-                Erros da Execução:
-              </Typography>
-              <Typography variant="body2" component="pre">
-                {compilationResult.stderr}
-              </Typography>
-            </Box>
+              
+              {/* Verifica se o backend devolveu erros de concorrência */}
+              {compilationResult.issues && compilationResult.issues.length > 0 ? (
+                compilationResult.issues.map((issue, index) => (
+                  <Box key={index} p={2} mt={1} style={{ backgroundColor: '#1e293b', borderRadius: '8px' }}>
+                     {/* Mensagem fria do SpotBugs */}
+                    <Typography variant="body2" style={{ color: '#fca5a5', fontWeight: 'bold' }}>
+                      Alerta Técnico (Linha {issue.lineNumber}): {issue.message}
+                    </Typography>
+                    
+                    {/* Explicação didática do LLM */}
+                    <Typography variant="body2" style={{ color: '#6ee7b7', marginTop: '8px', whiteSpace: 'pre-wrap' }}>
+                      🤖 Professor LLM: {issue.interpretation}
+                    </Typography>
+                  </Box>
+                ))
+              ) : (
+                <Typography variant="body2" style={{ color: '#a7f3d0' }}>
+                  Análise concluída: Nenhum problema de concorrência (threads) detetado no código!
+                </Typography>
+              )}
+            </>
           )}
         </Box>
       )}
@@ -173,14 +182,17 @@ const MeuEditor = ({ idArquivo, atualizarCaminho }) => {
 
   const handleCompile = async () => {
     try {
-      const response = await axios.post(`http://localhost:5000/api/compile`, {
-        caminho: caminhoArquivo,
+      const response = await axios.post(`http://localhost:8080/api/files/analisar`, {
+        fileName: "CodigoAluno.java",
+        content: conteudoArquivo,     
       });
-      setCompilationResult(response.data); // Armazena a resposta da compilação e execução
-      console.log("Resposta da compilação:", response.data);
+      
+      setCompilationResult(response.data); 
+      console.log("Análise recebida:", response.data);
+      
     } catch (error) {
-      setCompilationResult({ error: "Erro ao compilar e executar o arquivo" });
-      console.error("Erro ao compilar e executar o arquivo:", error);
+      setCompilationResult({ error: "Erro ao comunicar com o analisador de threads do backend." });
+      console.error("Erro ao analisar o código:", error);
     }
   };
 
