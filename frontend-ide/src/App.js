@@ -31,7 +31,8 @@ import ExemplosOpenMPI from './components/ExemplosOpenMPI';
 import ExemplosOpenACC from './components/ExemplosOpenACC';
 
 const App = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(true); // Para testes, já começa autenticado
   const PrivateRoute = ({ children }) => {
     return isAuthenticated ? children : <Navigate to="/" />;
   };
