@@ -107,11 +107,12 @@ const MeuEditor = ({ idArquivo, atualizarCaminho }) => {
   const [compilationResult, setCompilationResult] = useState(null);
 
   const obterLinguagem = () => {
-    if (!caminhoArquivo) return "cpp"; // Padrão
-    if (caminhoArquivo.endsWith(".java")) return "java";
-    if (caminhoArquivo.endsWith(".c")) return "c";
-    if (caminhoArquivo.endsWith(".cpp")) return "cpp";
-    return "cpp";
+    if (!caminhoArquivo) return "java"; // Se não tiver caminho, assume Java para o seu TCC
+    const extensao = caminhoArquivo.toLowerCase();
+    if (extensao.endsWith(".java")) return "java";
+    if (extensao.endsWith(".c")) return "c";
+    if (extensao.endsWith(".cpp") || extensao.endsWith(".c++") || extensao.endsWith(".cc")) return "cpp";
+    return "java"; 
   };
 
   const linguagemAtual = obterLinguagem();
