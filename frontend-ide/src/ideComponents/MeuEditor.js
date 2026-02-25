@@ -177,7 +177,7 @@ const MeuEditor = ({ idArquivo, atualizarCaminho }) => {
   const handleSave = async () => {
     try {
       if (caminhoArquivo) {
-        await axios.put(`http://localhost:8080/api/files/arquivos/conteudo`, {
+        await axios.put(`http://localhost:8081/api/files/arquivos/conteudo`, {
           caminho: caminhoArquivo,
           conteudo: conteudoArquivo,
         });
@@ -195,7 +195,7 @@ const MeuEditor = ({ idArquivo, atualizarCaminho }) => {
     try {
       // Se for Java, manda para o backend do seu TCC (Porta 8080)
       if (linguagemAtual === "java") {
-        const response = await axios.post(`http://localhost:8080/api/files/analisar`, {
+        const response = await axios.post(`http://localhost:8081/api/files/analisar`, {
           fileName: "CodigoAluno.java",
           content: conteudoArquivo,     
         });
