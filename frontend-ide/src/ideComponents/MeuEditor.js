@@ -104,7 +104,17 @@ const MeuEditor = ({ idArquivo, atualizarCaminho }) => {
   const [conteudoArquivo, setConteudoArquivo] = useState("");
   const [windowHeight, setWindowHeight] = useState(window.innerHeight);
   const [caminhoArquivo, setCaminhoArquivo] = useState(null);
-  const [compilationResult, setCompilationResult] = useState(null); // Estado para armazenar o resultado da compilação e execução
+  const [compilationResult, setCompilationResult] = useState(null);
+
+  const obterLinguagem = () => {
+    if (!caminhoArquivo) return "cpp"; // Padrão
+    if (caminhoArquivo.endsWith(".java")) return "java";
+    if (caminhoArquivo.endsWith(".c")) return "c";
+    if (caminhoArquivo.endsWith(".cpp")) return "cpp";
+    return "cpp";
+  };
+
+  const linguagemAtual = obterLinguagem();
 
   useEffect(() => {
     const obterCaminhoArquivo = async (idArquivo) => {
@@ -137,8 +147,8 @@ const MeuEditor = ({ idArquivo, atualizarCaminho }) => {
     const carregarArquivo = async (idArquivo) => {
       const caminho = await obterCaminhoArquivo(idArquivo);
       if (caminho) {
-        setCaminhoArquivo(caminho); // Salve o caminho do arquivo no estado
-        atualizarCaminho(caminho); // Chame a função de callback para atualizar o caminho no componente pai
+        setCaminhoArquivo(caminho); 
+        atualizarCaminho(caminho); 
         await obterConteudoArquivo(caminho);
       }
     };
@@ -150,7 +160,7 @@ const MeuEditor = ({ idArquivo, atualizarCaminho }) => {
     const handleResize = () => {
       setTimeout(() => {
         setWindowHeight(window.innerHeight);
-      }, 100); // Definir um atraso de 100ms
+      }, 100); 
     };
 
     window.addEventListener("resize", handleResize);
@@ -180,21 +190,32 @@ const MeuEditor = ({ idArquivo, atualizarCaminho }) => {
     }
   };
 
+  // --- NOVA PARTE 2: Botão Executar inteligente ---
   const handleCompile = async () => {
     try {
-      const response = await axios.post(`http://localhost:8080/api/files/analisar`, {
-        fileName: "CodigoAluno.java",
-        content: conteudoArquivo,     
-      });
-      
-      setCompilationResult(response.data); 
-      console.log("Análise recebida:", response.data);
-      
+      // Se for Java, manda para o backend do seu TCC (Porta 8080)
+      if (linguagemAtual === "java") {
+        const response = await axios.post(`http://localhost:8080/api/files/analisar`, {
+          fileName: "CodigoAluno.java",
+          content: conteudoArquivo,     
+        });
+        setCompilationResult(response.data); 
+        console.log("Análise Java recebida:", response.data);
+      } 
+      // Se for C ou C++, manda para o backend original (Porta 5000)
+      else {
+        const response = await axios.post(`http://localhost:5000/api/compile`, {
+          caminho: caminhoArquivo,
+        });
+        setCompilationResult(response.data); 
+        console.log("Resposta da compilação C/C++:", response.data);
+      }
     } catch (error) {
-      setCompilationResult({ error: "Erro ao comunicar com o analisador de threads do backend." });
+      setCompilationResult({ error: "Erro ao compilar e executar o arquivo." });
       console.error("Erro ao analisar o código:", error);
     }
   };
+  // ------------------------------------------------
 
   return (
     <div
@@ -223,8 +244,8 @@ const MeuEditor = ({ idArquivo, atualizarCaminho }) => {
       <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
         <MonacoEditor
           width="100%"
-          height="calc(100vh - 400px)" // Ajuste a altura para que o editor não ocupe todo o espaço disponível
-          language="cpp"
+          height="calc(100vh - 400px)"
+          language={linguagemAtual} // <--- NOVA PARTE 3: Pinta a linguagem certa
           theme="vs-dark"
           value={conteudoArquivo}
           onChange={handleChange}
