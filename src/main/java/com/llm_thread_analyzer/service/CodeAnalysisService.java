@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 
 import javax.tools.JavaCompiler;
 import javax.tools.ToolProvider;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -28,7 +29,6 @@ public class CodeAnalysisService {
         try {
             String caminhoFicheiroClass = compilarCodigo(sourceCode);
 
-            // PASSO 2: Analisar com o SpotBugs
             List<ConcurrencyIssue> issues = spotBugsDetector.detectConcurrencyIssues(caminhoFicheiroClass);
 
             for (ConcurrencyIssue issue : issues) {
@@ -41,18 +41,16 @@ public class CodeAnalysisService {
 
             return new CodeAnalysisResults(issues);
 
+        } catch (RuntimeException e) {
+            // Se for um erro que nós já tratámos (como o de compilação), passamos para cima
+            throw e;
         } catch (Exception e) {
             e.printStackTrace();
-            throw new RuntimeException("Erro durante a análise do código: " + e.getMessage());
+            throw new RuntimeException("Erro interno durante a análise do código: " + e.getMessage());
         }
     }
 
-    /**
-     * Escreve o código fonte num ficheiro temporário e compila-o.
-     * Retorna o caminho absoluto para o ficheiro .class gerado.
-     */
     private String compilarCodigo(SourceCode sourceCode) throws IOException {
-        // 1. Criar um diretório temporário para isolar a compilação
         Path tempDir = Files.createTempDirectory("thread-analyzer-");
         
         String nomeFicheiro = sourceCode.getFileName();
@@ -69,12 +67,21 @@ public class CodeAnalysisService {
 
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
         if (compiler == null) {
-            throw new RuntimeException("Compilador Java não encontrado. Certifique-se de que o projeto está a correr num JDK e não num JRE.");
+            throw new RuntimeException("Compilador Java não encontrado.");
         }
 
-        int result = compiler.run(null, null, null, sourceFile.getAbsolutePath());
+        // Criamos um fluxo para capturar os erros de sintaxe do Java
+        ByteArrayOutputStream errorStream = new ByteArrayOutputStream();
+
+        // Adicionada a flag "-g" e o redirecionamento de erros para o errorStream
+        int result = compiler.run(null, null, errorStream, "-g", sourceFile.getAbsolutePath());
+        
         if (result != 0) {
-            throw new RuntimeException("Erro de compilação: O código fornecido contém erros de sintaxe e não pôde ser compilado.");
+            // Transformamos os erros capturados numa String
+            String errosCompilacao = new String(errorStream.toByteArray());
+            
+            // Lançamos uma exceção com um "código" no início para o Controller identificar
+            throw new RuntimeException("ERRO_COMPILACAO:" + errosCompilacao);
         }
 
         String nomeFicheiroClass = nomeFicheiro.replace(".java", ".class");

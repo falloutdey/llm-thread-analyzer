@@ -20,15 +20,25 @@ public class CodeAnalysisController {
     @Autowired
     private CodeAnalysisService codeAnalysisService;
 
-    // Rota oficial para receber o código do aluno e iniciar a análise
     @PostMapping("/analisar")
     public ResponseEntity<?> analisarCodigoThread(@RequestBody SourceCode sourceCode) {
         try {
-            // Chama o serviço que orquestra a compilação, o SpotBugs e o LLM
             CodeAnalysisResults resultados = codeAnalysisService.analisarCodigo(sourceCode);
             return ResponseEntity.ok(resultados);
+            
+        } catch (RuntimeException e) {
+            // Verifica se é um erro de sintaxe do aluno
+            if (e.getMessage() != null && e.getMessage().startsWith("ERRO_COMPILACAO:")) {
+                String detalhesErro = e.getMessage().replace("ERRO_COMPILACAO:", "").trim();
+                
+                // Retorna 400 Bad Request (O aluno errou, não o servidor)
+                return ResponseEntity.badRequest().body("Erro de Sintaxe! O teu código não compila. Por favor, corrige os seguintes erros antes de analisar as threads:\n\n" + detalhesErro);
+            }
+            
+            // Outros erros de execução
+            return ResponseEntity.internalServerError().body("Erro interno: " + e.getMessage());
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().body("Erro ao analisar o código: " + e.getMessage());
+            return ResponseEntity.internalServerError().body("Erro inesperado ao analisar o código: " + e.getMessage());
         }
     }
 }
