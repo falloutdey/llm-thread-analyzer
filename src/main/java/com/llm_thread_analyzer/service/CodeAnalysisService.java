@@ -26,6 +26,9 @@ public class CodeAnalysisService {
     private LLMFeedbackService llmFeedbackService;
 
     public CodeAnalysisResults analisarCodigo(SourceCode sourceCode) {
+        if (sourceCode == null || sourceCode.getContent() == null || sourceCode.getContent().trim().isEmpty()) {
+        throw new RuntimeException("O código fonte enviado está vazio ou num formato inválido.");
+        }
         try {
             String caminhoFicheiroClass = compilarCodigo(sourceCode);
 

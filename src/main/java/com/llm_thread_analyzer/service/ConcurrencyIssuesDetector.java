@@ -43,7 +43,7 @@ public class ConcurrencyIssuesDetector {
 
             BugCollection bugCollection = reporter.getBugCollection();
             
-            System.out.println("====== RELATÓRIO DO SPOTBUGS ======");
+            System.out.println("RELATÓRIO DO SPOTBUGS");
             System.out.println("Total de bugs encontrados: " + bugCollection.getCollection().size());
 
             for(BugInstance bug : bugCollection) {
@@ -62,7 +62,6 @@ public class ConcurrencyIssuesDetector {
                     issues.add(new ConcurrencyIssue(type, linha, bug.getMessage()));
                 }
             }
-            System.out.println("===================================");
             
         } catch (IOException | InterruptedException e) {
             e.printStackTrace();

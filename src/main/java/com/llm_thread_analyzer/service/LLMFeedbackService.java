@@ -24,7 +24,7 @@ public class LLMFeedbackService {
     private RestTemplate restTemplate;
 
     public String gerarFeedbackDidatico(String erroSpotBugs, String codigoFonte) {
-        System.out.println("\n[LLM] ⏳ A iniciar pedido de explicação ao Google Gemini...");
+        System.out.println("\n[LLM] A iniciar pedido de explicação ao Google Gemini...");
         
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -57,18 +57,16 @@ public class LLMFeedbackService {
                 
                 String textoResposta = (String) parts.get(0).get("text");
                 
-                System.out.println("\n==================================================");
-                System.out.println("💡 RESPOSTA RECEBIDA DO GEMINI:");
-                System.out.println("==================================================");
+                System.out.println("RESPOSTA RECEBIDA DO GEMINI:");
                 System.out.println(textoResposta);
-                System.out.println("==================================================\n");
+                System.out.println("\n");
                 
                 return textoResposta;
             } else {
-                System.out.println("\n[LLM] ⚠️ A resposta do Gemini não veio no formato esperado: " + responseBody);
+                System.out.println("\n[LLM] A resposta do Gemini não veio no formato esperado: " + responseBody);
             }
         } catch (Exception e) {
-            System.err.println("\n[LLM] ❌ Erro ao contactar o Gemini: " + e.getMessage());
+            System.err.println("\n[LLM] Erro ao contactar o Gemini: " + e.getMessage());
             e.printStackTrace();
             return "Ocorreu um erro ao gerar a explicação com a IA.";
         }
