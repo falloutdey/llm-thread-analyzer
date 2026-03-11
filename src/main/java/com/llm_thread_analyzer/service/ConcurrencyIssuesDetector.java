@@ -19,7 +19,7 @@ public class ConcurrencyIssuesDetector {
         File classFile = new File(classFilePath);
         File classDir = classFile.getParentFile();
 
-        // Verificar se o ficheiro .class existe antes de prosseguir
+        // CORREÇÃO 1: Verificar se o ficheiro .class existe antes de prosseguir
         if (!classFile.exists()) {
             throw new RuntimeException("Ficheiro .class não encontrado no caminho: " + classFilePath);
         }
@@ -38,7 +38,7 @@ public class ConcurrencyIssuesDetector {
 
         Project project = new Project();
 
-        // Adicionar TODOS os .class do diretório temporário ao projeto
+        // CORREÇÃO 2: Adicionar TODOS os .class do diretório temporário ao projeto
         // Necessário para capturar bugs em classes internas (ex: Main$Worker.class, Main$1.class)
         // onde os bugs de concorrência frequentemente se manifestam (Runnables anônimos, etc.)
         File[] allClasses = classDir.listFiles((dir, name) -> name.endsWith(".class"));
@@ -54,7 +54,7 @@ public class ConcurrencyIssuesDetector {
         project.addAuxClasspathEntry(classDir.getAbsolutePath());
         project.addAuxClasspathEntry(System.getProperty("java.class.path"));
 
-        // Usar try-with-resources para garantir que o FindBugs2 é sempre fechado
+        // CORREÇÃO 3: Usar try-with-resources para garantir que o FindBugs2 é sempre fechado
         // Evita vazamento de file handles e threads internas acumuladas em baterias de testes longas
         try (FindBugs2 findBugs = new FindBugs2()) {
             findBugs.setProject(project);
@@ -84,7 +84,7 @@ public class ConcurrencyIssuesDetector {
                 // Filtro robusto: MT_CORRECTNESS ou qualquer tipo que mencione THREAD ou SYNCH
                 if (category.equals("MT_CORRECTNESS") || type.contains("THREAD") || type.contains("SYNCH")) {
 
-                    // lineNumber 0 em vez de -1 para bugs sem linha determinável
+                    // CORREÇÃO 4: lineNumber 0 em vez de -1 para bugs sem linha determinável
                     // 0 = bug de nível estrutural (classe/método) sem linha específica identificável
                     int linha = 0;
                     if (bug.getPrimarySourceLineAnnotation() != null) {
@@ -96,17 +96,17 @@ public class ConcurrencyIssuesDetector {
             }
 
             System.out.println("Total de issues de concorrência filtrados: " + issues.size());
-            System.out.println("\n");
+            System.out.println("=================================\n");
 
         } catch (IOException | InterruptedException e) {
             if (e instanceof InterruptedException) {
                 Thread.currentThread().interrupt();
             }
-            // Lançar exceção em vez de engolir o erro e retornar lista vazia silenciosamente
+            // CORREÇÃO 5: Lançar exceção em vez de engolir o erro e retornar lista vazia silenciosamente
             // Retornar lista vazia faria o pipeline parecer "sem bugs" quando na verdade o SpotBugs falhou
             throw new RuntimeException("[SpotBugs] Erro durante a execução da análise: " + e.getMessage(), e);
         } catch (Exception e) {
-            // Mesmo para exceções genéricas, nunca retornar silenciosamente
+            // CORREÇÃO 5 (cont.): Mesmo para exceções genéricas — nunca retornar silenciosamente
             System.err.println("[SpotBugs] FALHA CRÍTICA NA ANÁLISE: " + e.getClass().getName() + " - " + e.getMessage());
             e.printStackTrace();
             throw new RuntimeException("[SpotBugs] Falha crítica durante a análise estática: " + e.getMessage(), e);

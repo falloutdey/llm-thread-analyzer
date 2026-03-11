@@ -35,9 +35,28 @@ public class CodeAnalysisController {
                     "Erro de Sintaxe! O teu código não compila. Por favor, corrige os seguintes erros antes de analisar as threads:\n\n" + detalhesErro
                 );
             }
-            return ResponseEntity.internalServerError().body("Erro interno: " + e.getMessage());
+            // CORREÇÃO: Código que compila mas não gera classes analisáveis (ex: só interfaces,
+            // código vazio) é culpa do input do aluno — HTTP 400, não HTTP 500.
+            // HTTP 500 indica falha do servidor; HTTP 400 indica input inválido (boas práticas REST).
+            if (e.getMessage() != null && e.getMessage().startsWith("ERRO_ESTRUTURA:")) {
+                String detalhesErro = e.getMessage().replace("ERRO_ESTRUTURA:", "").trim();
+                return ResponseEntity.badRequest().body(detalhesErro);
+            }
+            // SEGURANÇA: e.getMessage() pode expor caminhos internos do servidor (ex: /var/tmp/thread-analyzer-...)
+            // ou detalhes de infraestrutura — OWASP A05 Sensitive Data Exposure.
+            // O detalhe técnico é registado no log do servidor para depuração,
+            // mas o cliente recebe apenas uma mensagem genérica e segura.
+            System.err.println("[Controller] Erro interno em /analisar: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().body(
+                "Ocorreu um erro interno no servidor ao processar o código. Tenta novamente mais tarde."
+            );
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().body("Erro inesperado ao analisar o código: " + e.getMessage());
+            System.err.println("[Controller] Erro inesperado em /analisar: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().body(
+                "Ocorreu um erro interno no servidor ao processar o código. Tenta novamente mais tarde."
+            );
         }
     }
 
@@ -67,7 +86,11 @@ public class CodeAnalysisController {
             List<CodeAnalysisResults> resultados = codeAnalysisService.analisarBatch(codigos);
             return ResponseEntity.ok(resultados);
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().body("Erro inesperado durante o processamento do batch: " + e.getMessage());
+            System.err.println("[Controller] Erro inesperado em /analisar/batch: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().body(
+                "Ocorreu um erro interno no servidor ao processar o batch. Tenta novamente mais tarde."
+            );
         }
     }
 }
