@@ -69,10 +69,44 @@ public class LLMFeedbackService {
 
             if (responseBody != null && responseBody.containsKey("candidates")) {
                 List<Map<String, Object>> candidates = (List<Map<String, Object>>) responseBody.get("candidates");
-                Map<String, Object> content = (Map<String, Object>) candidates.get(0).get("content");
+
+                // Verificação defensiva, candidates pode estar vazia se o Gemini bloquear
+                // a resposta por Safety Ratings (conteúdo considerado sensível pelo modelo).
+                // Códigos bugados do JCB podem acionar esses filtros inesperadamente.
+                if (candidates == null || candidates.isEmpty()) {
+                    String bloqueio = responseBody.containsKey("promptFeedback")
+                            ? responseBody.get("promptFeedback").toString()
+                            : "sem detalhe";
+                    System.err.println("[LLM] Resposta bloqueada pelo Safety Filter do Gemini. Detalhe: " + bloqueio);
+                    throw new LlmApiException("Resposta bloqueada pelo Safety Filter do Gemini. Detalhe: " + bloqueio);
+                }
+
+                Map<String, Object> primeiroCandidate = candidates.get(0);
+
+                // content pode ser null se o Gemini bloquear apenas o candidate específico
+                Map<String, Object> content = (Map<String, Object>) primeiroCandidate.get("content");
+                if (content == null) {
+                    String finishReason = primeiroCandidate.containsKey("finishReason")
+                            ? primeiroCandidate.get("finishReason").toString()
+                            : "desconhecido";
+                    System.err.println("[LLM] Campo 'content' ausente no candidate. finishReason: " + finishReason);
+                    throw new LlmApiException("Gemini não retornou conteúdo. finishReason: " + finishReason);
+                }
+
                 List<Map<String, Object>> parts = (List<Map<String, Object>>) content.get("parts");
 
+                // parts também pode ser null ou vazia em edge cases de resposta parcial
+                if (parts == null || parts.isEmpty()) {
+                    System.err.println("[LLM] Campo 'parts' ausente ou vazio na resposta do Gemini.");
+                    throw new LlmApiException("Gemini retornou 'parts' ausente ou vazio na resposta.");
+                }
+
                 String textoResposta = (String) parts.get(0).get("text");
+
+                if (textoResposta == null || textoResposta.isBlank()) {
+                    System.err.println("[LLM] Campo 'text' ausente ou vazio na resposta do Gemini.");
+                    throw new LlmApiException("Gemini retornou texto de resposta vazio.");
+                }
 
                 System.out.println("[LLM] Resposta recebida do Gemini com sucesso.");
                 System.out.println(textoResposta);
@@ -80,7 +114,7 @@ public class LLMFeedbackService {
 
                 return textoResposta;
             } else {
-                // Resposta veio mas sem o formato esperado, não é uma resposta válida
+                // Resposta veio mas sem o formato esperado — não é uma resposta válida
                 String respostaRaw = responseBody != null ? responseBody.toString() : "null";
                 System.err.println("[LLM] Resposta do Gemini fora do formato esperado: " + respostaRaw);
                 throw new LlmApiException("Resposta do Gemini fora do formato esperado: " + respostaRaw);

@@ -15,9 +15,11 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.Semaphore;
 
 @Service
 public class CodeAnalysisService {
@@ -25,6 +27,11 @@ public class CodeAnalysisService {
     // Intervalo entre chamadas ao Gemini para respeitar o rate limit do tier gratuito (~15 RPM)
     // 4500ms = ~13 requisições/minuto, com margem de segurança
     private static final long GEMINI_RATE_LIMIT_DELAY_MS = 4500;
+
+    // Semaphore global para controle de concorrência nas chamadas ao Gemini
+    // O Semaphore garante que apenas UMA thread faz a chamada ao LLM de cada vez,
+    // independentemente de quantas requisições simultâneas o Spring Boot esteja a processar.
+    private static final Semaphore GEMINI_SEMAPHORE = new Semaphore(1);
 
     @Autowired
     private ConcurrencyIssuesDetector spotBugsDetector;
@@ -51,28 +58,34 @@ public class CodeAnalysisService {
             for (int i = 0; i < issues.size(); i++) {
                 ConcurrencyIssue issue = issues.get(i);
                 try {
-                    String explicacao = llmFeedbackService.gerarFeedbackDidatico(
-                            issue.getMessage(),
-                            sourceCode.getContent()
-                    );
-                    issue.setInterpretation(explicacao);
+                    // Adquirir o Semaphore antes de chamar o Gemini
+                    // Garante exclusividade global mesmo com múltiplas threads simultâneas
+                    GEMINI_SEMAPHORE.acquire();
+                    try {
+                        String explicacao = llmFeedbackService.gerarFeedbackDidatico(
+                                issue.getMessage(),
+                                sourceCode.getContent()
+                        );
+                        issue.setInterpretation(explicacao);
+                    } finally {
+                        // Sleep dentro do bloco finally, o delay é aplicado ANTES
+                        // de libertar o semáforo, garantindo que a próxima thread só avança
+                        // após o intervalo de rate limit, não apenas após a chamada terminar
+                        if (i < issues.size() - 1) {
+                            System.out.println("[CodeAnalysis] Aguardando " + GEMINI_RATE_LIMIT_DELAY_MS + "ms (rate limit)...");
+                            Thread.sleep(GEMINI_RATE_LIMIT_DELAY_MS);
+                        }
+                        GEMINI_SEMAPHORE.release();
+                    }
                 } catch (LlmApiException e) {
-                    // Falha do LLM é marcada estruturalmente na issue
-                    // O processamento dos outros issues do mesmo ficheiro continua normalmente
+                    // Falha do LLM marcada estruturalmente — não interrompe os outros issues
                     System.err.println("[CodeAnalysis] Falha do LLM para issue #" + i + ": " + e.getMessage());
                     issue.setLlmError(true);
                     issue.setLlmErrorMessage(e.getMessage());
-                }
-
-                // Aguardar entre chamadas ao Gemini para evitar 429 Too Many Requests
-                // Aplicado após cada issue, exceto o último
-                if (i < issues.size() - 1) {
-                    try {
-                        System.out.println("[CodeAnalysis] Aguardando " + GEMINI_RATE_LIMIT_DELAY_MS + "ms antes da próxima chamada ao Gemini...");
-                        Thread.sleep(GEMINI_RATE_LIMIT_DELAY_MS);
-                    } catch (InterruptedException ie) {
-                        Thread.currentThread().interrupt();
-                    }
+                    GEMINI_SEMAPHORE.release();
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    GEMINI_SEMAPHORE.release();
                 }
             }
 
@@ -84,7 +97,7 @@ public class CodeAnalysisService {
             e.printStackTrace();
             throw new RuntimeException("Erro interno durante a análise do código: " + e.getMessage());
         } finally {
-            // Limpeza garantida do diretório temporário após o SpotBugs terminar
+            //Limpeza garantida do diretório temporário após o SpotBugs terminar
             // Evita acumulação de centenas de diretórios durante a bateria de testes JCB
             if (tempDir != null) {
                 deletarDiretorioTemporario(tempDir);
@@ -127,8 +140,14 @@ public class CodeAnalysisService {
         String nomeFicheiro = sourceCode.getFileName();
         if (nomeFicheiro == null || nomeFicheiro.isEmpty()) {
             nomeFicheiro = "Main.java";
-        } else if (!nomeFicheiro.endsWith(".java")) {
-            nomeFicheiro += ".java";
+        } else {
+            // Sanitização contra Path Traversal
+            // Paths.get().getFileName() extrai apenas o nome final, descartando qualquer prefixo de diretório.
+            nomeFicheiro = Paths.get(nomeFicheiro).getFileName().toString();
+
+            if (!nomeFicheiro.endsWith(".java")) {
+                nomeFicheiro += ".java";
+            }
         }
 
         File sourceFile = new File(tempDir.toFile(), nomeFicheiro);
