@@ -7,6 +7,12 @@ public class CodeAnalysisResults {
 
     private List<ConcurrencyIssue> issues = new ArrayList<>();
 
+    // Campos para identificar falhas no processamento batch
+    // Permite que um ficheiro com erro não quebre o JSON inteiro da bateria JCB
+    private boolean batchError = false;
+    private String batchErrorMessage;
+    private String fileName;
+
     public CodeAnalysisResults() {}
 
     public CodeAnalysisResults(List<ConcurrencyIssue> issues) {
@@ -23,5 +29,29 @@ public class CodeAnalysisResults {
 
     public boolean hasIssues() {
         return !issues.isEmpty();
+    }
+
+    public boolean isBatchError() {
+        return batchError;
+    }
+
+    public void setBatchError(boolean batchError) {
+        this.batchError = batchError;
+    }
+
+    public String getBatchErrorMessage() {
+        return batchErrorMessage;
+    }
+
+    public void setBatchErrorMessage(String batchErrorMessage) {
+        this.batchErrorMessage = batchErrorMessage;
+    }
+
+    public String getFileName() {
+        return fileName;
+    }
+
+    public void setFileName(String fileName) {
+        this.fileName = fileName;
     }
 }

@@ -3,8 +3,7 @@ package com.llm_thread_analyzer.model;
 public class SourceCode {
     private String fileName;
     private String content;
-
-    // Construtor vazio (obrigatório para o Spring)
+    
     public SourceCode() {}
 
     public SourceCode(String fileName, String content) {
