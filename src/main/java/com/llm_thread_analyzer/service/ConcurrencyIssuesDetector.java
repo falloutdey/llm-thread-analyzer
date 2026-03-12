@@ -16,15 +16,17 @@ public class ConcurrencyIssuesDetector {
     public List<ConcurrencyIssue> detectConcurrencyIssues(String classFilePath) {
         List<ConcurrencyIssue> issues = new ArrayList<>();
 
-        File classFile = new File(classFilePath);
-        File classDir = classFile.getParentFile();
+        // classFilePath é o diretório temporário gerado pela compilação.
+        // Usar o diretório inteiro (em vez de um ficheiro .class específico) permite
+        // analisar também classes internas geradas pelo compilador (ex: Main$Worker.class),
+        // onde bugs de concorrência em Runnables anónimos frequentemente se manifestam.
+        File classDir = new File(classFilePath);
 
-        // Verificar se o ficheiro .class existe antes de prosseguir
-        if (!classFile.exists()) {
-            throw new RuntimeException("Ficheiro .class não encontrado no caminho: " + classFilePath);
+        if (!classDir.exists() || !classDir.isDirectory()) {
+            throw new RuntimeException("[SpotBugs] Diretório de classes não encontrado: " + classFilePath);
         }
 
-        // Verificar se a DetectorFactoryCollection está disponível (pode falhar em ambientes headless/Docker)
+        // Verifica se o SpotBugs está disponível no classpath antes de prosseguir
         DetectorFactoryCollection detectorFactoryCollection;
         try {
             detectorFactoryCollection = DetectorFactoryCollection.instance();
@@ -33,14 +35,12 @@ public class ConcurrencyIssuesDetector {
                         "Verifique se o SpotBugs está corretamente no classpath.");
             }
         } catch (Exception e) {
-            throw new RuntimeException("[SpotBugs] FALHA CRÍTICA ao inicializar DetectorFactoryCollection: " + e.getMessage(), e);
+            throw new RuntimeException("[SpotBugs] Falha ao inicializar DetectorFactoryCollection: " + e.getMessage(), e);
         }
 
         Project project = new Project();
 
-        // Adicionar TODOS os .class do diretório temporário ao projeto
-        // Necessário para capturar bugs em classes internas (ex: Main$Worker.class, Main$1.class)
-        // onde os bugs de concorrência frequentemente se manifestam (Runnables anônimos, etc.)
+        // Adiciona todos os ficheiros .class do diretório ao projeto SpotBugs
         File[] allClasses = classDir.listFiles((dir, name) -> name.endsWith(".class"));
         if (allClasses != null && allClasses.length > 0) {
             for (File cf : allClasses) {
@@ -54,26 +54,27 @@ public class ConcurrencyIssuesDetector {
         project.addAuxClasspathEntry(classDir.getAbsolutePath());
         project.addAuxClasspathEntry(System.getProperty("java.class.path"));
 
-        // Usar try-with-resources para garantir que o FindBugs2 é sempre fechado
-        // Evita vazamento de file handles e threads internas acumuladas em baterias de testes longas
+        // try-with-resources garante que o FindBugs2 é sempre fechado após a análise,
+        // libertando file handles e threads internas — importante em baterias de testes longas
         try (FindBugs2 findBugs = new FindBugs2()) {
             findBugs.setProject(project);
             findBugs.setDetectorFactoryCollection(detectorFactoryCollection);
 
-            // Forçar o nível máximo de esforço para cobertura total
+            // Nível máximo de esforço para cobertura total de bugs
             UserPreferences prefs = UserPreferences.createDefaultUserPreferences();
             prefs.setEffort(UserPreferences.EFFORT_MAX);
             findBugs.setUserPreferences(prefs);
 
+            // Captura todos os avisos independentemente da prioridade
             BugCollectionBugReporter reporter = new BugCollectionBugReporter(project);
-            reporter.setPriorityThreshold(Priorities.LOW_PRIORITY); // Capturar todos os avisos
+            reporter.setPriorityThreshold(Priorities.LOW_PRIORITY);
             findBugs.setBugReporter(reporter);
 
             findBugs.execute();
 
             BugCollection bugCollection = reporter.getBugCollection();
 
-            System.out.println("\nRELATÓRIO DO SPOTBUGS");
+            System.out.println("\n===== RELATÓRIO DO SPOTBUGS =====");
             System.out.println("Total de bugs encontrados (todas as categorias): " + bugCollection.getCollection().size());
 
             for (BugInstance bug : bugCollection) {
@@ -81,11 +82,12 @@ public class ConcurrencyIssuesDetector {
                 String type = bug.getType();
                 System.out.println("Bug Detetado -> Categoria: " + category + " | Tipo: " + type);
 
-                // Filtro robusto: MT_CORRECTNESS ou qualquer tipo que mencione THREAD ou SYNCH
+                // Filtra apenas bugs de concorrência: categoria MT_CORRECTNESS
+                // ou tipos cujo nome mencione THREAD ou SYNCH
                 if (category.equals("MT_CORRECTNESS") || type.contains("THREAD") || type.contains("SYNCH")) {
 
-                    // lineNumber 0 em vez de -1 para bugs sem linha determinável
-                    // 0 = bug de nível estrutural (classe/método) sem linha específica identificável
+                    // lineNumber 0 indica bug de nível estrutural (classe/método)
+                    // sem linha específica identificável no código fonte
                     int linha = 0;
                     if (bug.getPrimarySourceLineAnnotation() != null) {
                         linha = bug.getPrimarySourceLineAnnotation().getStartLine();
@@ -96,20 +98,17 @@ public class ConcurrencyIssuesDetector {
             }
 
             System.out.println("Total de issues de concorrência filtrados: " + issues.size());
-            System.out.println("\n");
+            System.out.println("=================================\n");
 
         } catch (IOException | InterruptedException e) {
             if (e instanceof InterruptedException) {
                 Thread.currentThread().interrupt();
             }
-            // Lançar exceção em vez de engolir o erro e retornar lista vazia silenciosamente
-            // Retornar lista vazia faria o pipeline parecer "sem bugs" quando na verdade o SpotBugs falhou
             throw new RuntimeException("[SpotBugs] Erro durante a execução da análise: " + e.getMessage(), e);
         } catch (Exception e) {
-            // Mesmo para exceções genéricas — nunca retornar silenciosamente
-            System.err.println("[SpotBugs] FALHA CRÍTICA NA ANÁLISE: " + e.getClass().getName() + " - " + e.getMessage());
+            System.err.println("[SpotBugs] Falha na análise: " + e.getClass().getName() + " - " + e.getMessage());
             e.printStackTrace();
-            throw new RuntimeException("[SpotBugs] Falha crítica durante a análise estática: " + e.getMessage(), e);
+            throw new RuntimeException("[SpotBugs] Falha durante a análise estática: " + e.getMessage(), e);
         }
 
         return issues;
