@@ -54,14 +54,6 @@ public class CodeAnalysisService {
             );
         }
 
-        final int LIMITE_CARACTERES = 50_000;
-        if (sourceCode.getContent().length() > LIMITE_CARACTERES) {
-            throw new RuntimeException(
-                "Código demasiado longo para análise. Máximo permitido: " + LIMITE_CARACTERES +
-                " caracteres. Recebido: " + sourceCode.getContent().length() + " caracteres."
-            );
-        }
-
         Path tempDir = null;
         try {
             tempDir = Files.createTempDirectory("thread-analyzer-");
