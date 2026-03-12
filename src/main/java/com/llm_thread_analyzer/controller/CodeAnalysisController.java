@@ -35,15 +35,15 @@ public class CodeAnalysisController {
                     "Erro de Sintaxe! O teu código não compila. Por favor, corrige os seguintes erros antes de analisar as threads:\n\n" + detalhesErro
                 );
             }
-            // CORREÇÃO: Código que compila mas não gera classes analisáveis (ex: só interfaces,
-            // código vazio) é culpa do input do aluno — HTTP 400, não HTTP 500.
+            // Código que compila mas não gera classes analisáveis (ex: só interfaces,
+            // código vazio) é culpa do input do aluno, HTTP 400, não HTTP 500.
             // HTTP 500 indica falha do servidor; HTTP 400 indica input inválido (boas práticas REST).
             if (e.getMessage() != null && e.getMessage().startsWith("ERRO_ESTRUTURA:")) {
                 String detalhesErro = e.getMessage().replace("ERRO_ESTRUTURA:", "").trim();
                 return ResponseEntity.badRequest().body(detalhesErro);
             }
-            // SEGURANÇA: e.getMessage() pode expor caminhos internos do servidor (ex: /var/tmp/thread-analyzer-...)
-            // ou detalhes de infraestrutura — OWASP A05 Sensitive Data Exposure.
+            // e.getMessage() pode expor caminhos internos do servidor (ex: /var/tmp/thread-analyzer-...)
+            // ou detalhes de infraestrutura, OWASP A05 Sensitive Data Exposure.
             // O detalhe técnico é registado no log do servidor para depuração,
             // mas o cliente recebe apenas uma mensagem genérica e segura.
             System.err.println("[Controller] Erro interno em /analisar: " + e.getMessage());
@@ -73,7 +73,7 @@ public class CodeAnalysisController {
      * Ficheiros com erro de compilação ou falha interna retornam com batchError: true
      * e não interrompem o processamento dos restantes.
      *
-     * ATENÇÃO: Para baterias grandes, considere o rate limit do Gemini (~15 RPM no tier gratuito).
+     * Para baterias grandes, considere o rate limit do Gemini (~15 RPM no tier gratuito).
      * O delay de 4500ms já está aplicado internamente entre cada chamada ao LLM.
      */
     @PostMapping("/analisar/batch")

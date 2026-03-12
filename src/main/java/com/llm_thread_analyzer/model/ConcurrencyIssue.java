@@ -24,21 +24,51 @@ public class ConcurrencyIssue {
         this.message = message;
     }
 
-    public String getType() { return type; }
-    public void setType(String type) { this.type = type; }
+    public String getType() { 
+        return type; 
+    }
 
-    public int getLineNumber() { return lineNumber; }
-    public void setLineNumber(int lineNumber) { this.lineNumber = lineNumber; }
+    public void setType(String type) { 
+        this.type = type; 
+    }
 
-    public String getMessage() { return message; }
-    public void setMessage(String message) { this.message = message; }
+    public int getLineNumber() { 
+        return lineNumber; 
+    }
 
-    public String getInterpretation() { return interpretation; }
-    public void setInterpretation(String interpretation) { this.interpretation = interpretation; }
+    public void setLineNumber(int lineNumber) { 
+        this.lineNumber = lineNumber; 
+    }
 
-    public boolean isLlmError() { return llmError; }
-    public void setLlmError(boolean llmError) { this.llmError = llmError; }
+    public String getMessage() { 
+        return message;
+    }
 
-    public String getLlmErrorMessage() { return llmErrorMessage; }
-    public void setLlmErrorMessage(String llmErrorMessage) { this.llmErrorMessage = llmErrorMessage; }
+    public void setMessage(String message) { 
+        this.message = message; 
+    }
+
+    public String getInterpretation() { 
+        return interpretation; 
+    }
+
+    public void setInterpretation(String interpretation) { 
+        this.interpretation = interpretation; 
+    }
+
+    public boolean isLlmError() { 
+        return llmError; 
+    }
+
+    public void setLlmError(boolean llmError) { 
+        this.llmError = llmError; 
+    }
+
+    public String getLlmErrorMessage() { 
+        return llmErrorMessage; 
+    }
+
+    public void setLlmErrorMessage(String llmErrorMessage) { 
+        this.llmErrorMessage = llmErrorMessage; 
+    }
 }

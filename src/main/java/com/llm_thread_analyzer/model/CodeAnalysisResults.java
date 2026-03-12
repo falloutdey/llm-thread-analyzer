@@ -20,17 +20,39 @@ public class CodeAnalysisResults {
         this.issues = issues;
     }
 
-    public List<ConcurrencyIssue> getIssues() { return issues; }
-    public void setIssues(List<ConcurrencyIssue> issues) { this.issues = issues; }
+    public List<ConcurrencyIssue> getIssues() { 
+        return issues; 
+    }
 
-    public boolean hasIssues() { return !issues.isEmpty(); }
+    public void setIssues(List<ConcurrencyIssue> issues) { 
+        this.issues = issues; 
+    }
 
-    public boolean isBatchError() { return batchError; }
-    public void setBatchError(boolean batchError) { this.batchError = batchError; }
+    public boolean hasIssues() { 
+        return !issues.isEmpty(); 
+    }
 
-    public String getBatchErrorMessage() { return batchErrorMessage; }
-    public void setBatchErrorMessage(String batchErrorMessage) { this.batchErrorMessage = batchErrorMessage; }
+    public boolean isBatchError() { 
+        return batchError; 
+    }
 
-    public String getFileName() { return fileName; }
-    public void setFileName(String fileName) { this.fileName = fileName; }
+    public void setBatchError(boolean batchError) { 
+        this.batchError = batchError; 
+    }
+
+    public String getBatchErrorMessage() { 
+        return batchErrorMessage; 
+    }
+
+    public void setBatchErrorMessage(String batchErrorMessage) { 
+        this.batchErrorMessage = batchErrorMessage; 
+    }
+
+    public String getFileName() { 
+        return fileName; 
+    }
+
+    public void setFileName(String fileName) { 
+        this.fileName = fileName; 
+    }
 }
