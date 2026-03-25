@@ -11,6 +11,7 @@ import RotaSala from './components/RotaSala';
 import RotaJogo from './components/RotaJogo';
 import RotaConfigurar from './components/RotaConfigurar';
 import CriarCodigoMP from './components/CriarCodigoMP';
+import EditorJavaThreads from './components/EditorJavaThreads';
 
 import EditorOpenMP from './components/EditorOpenMP';
 import EditorOpenMPI from './components/EditorOpenMPI';
@@ -33,9 +34,11 @@ import ExemplosOpenACC from './components/ExemplosOpenACC';
 const App = () => {
   // const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(true); // Para testes, já começa autenticado
+  
   const PrivateRoute = ({ children }) => {
     return isAuthenticated ? children : <Navigate to="/" />;
   };
+
   return (
     <BrowserRouter>
       <Routes>
@@ -58,7 +61,6 @@ const App = () => {
         <Route path="/ajuda" element={<CentralAjuda />} /> 
         <Route path="/tutoriais" element={<Tutoriais />} /> 
 
-
         {/* Rotas do OpenMP */}
         <Route path="/criar-openmp" element={<CriarCodigoMP />} />
         <Route path="/openmp-examples" element={<ExemplosOpenMP />} />
@@ -76,9 +78,13 @@ const App = () => {
         <Route path="/openacc-examples" element={<ExemplosOpenACC />} />
         <Route path="/projetos-open-acc" element={<PrivateRoute><ArquivosACC /></PrivateRoute>} /> 
         <Route path="/editor-open-acc/:idProjeto/:idArquivo" element={<EditorOpenACC />} />
-       
+        
+        {/* Sua Rota do TCC (Java Threads) */}
+        <Route path="/editor-java-threads/:idProjeto/:idArquivo" element={<EditorJavaThreads />} />
+        
       </Routes>
     </BrowserRouter>
   );
 };
+
 export default App;

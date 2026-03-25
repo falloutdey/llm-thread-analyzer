@@ -15,7 +15,7 @@ import MemoryUsageComponent from "./MemoryUsageComponent";
 
 const StyledButton = styled(Button)`
   &:hover {
-    background-color: #232226; // Altere para a cor desejada
+    background-color: #232226; 
   }
 `;
 
@@ -33,14 +33,12 @@ const CompileButton = ({ onCompile }) => {
 const HomeButton = ({ onCompile }) => {
   return (
     <StyledButton onClick={onCompile} style={{ marginRight: '150px'}}>
-      <Link
-            to="/homepage"
-          >
+      <Link to="/homepage">
             <img style={{ maxWidth: '30%', height: 'auto' }}
               src={Home}
               alt="Executar"
           />
-          </Link>
+      </Link>
     </StyledButton>
   );
 };
@@ -100,7 +98,7 @@ const CompileResult = ({ compilationResult }) => {
   );
 };
 
-const MeuEditor = ({ idArquivo, atualizarCaminho }) => {
+const MeuEditor = ({ idArquivo, atualizarCaminho, onChange }) => {
   const [conteudoArquivo, setConteudoArquivo] = useState("");
   const [windowHeight, setWindowHeight] = useState(window.innerHeight);
   const [caminhoArquivo, setCaminhoArquivo] = useState(null);
@@ -173,6 +171,9 @@ const MeuEditor = ({ idArquivo, atualizarCaminho }) => {
 
   const handleChange = (newValue) => {
     setConteudoArquivo(newValue);
+    if(onChange) {
+      onChange(newValue);
+    }
   };
 
   const handleSave = async () => {
@@ -191,10 +192,9 @@ const MeuEditor = ({ idArquivo, atualizarCaminho }) => {
     }
   };
 
-  // --- NOVA PARTE 2: Botão Executar inteligente ---
   const handleCompile = async () => {
     try {
-      // Se for Java, manda para o backend do seu TCC (Porta 8080)
+      // Se for Java, manda para o backend do seu TCC (Porta 8081)
       if (linguagemAtual === "java") {
         const response = await axios.post(`http://localhost:8081/api/files/analisar`, {
           fileName: "CodigoAluno.java",
@@ -216,7 +216,6 @@ const MeuEditor = ({ idArquivo, atualizarCaminho }) => {
       console.error("Erro ao analisar o código:", error);
     }
   };
-  // ------------------------------------------------
 
   return (
     <div
@@ -234,19 +233,23 @@ const MeuEditor = ({ idArquivo, atualizarCaminho }) => {
           conteudo={conteudoArquivo}
           caminhoArquivo={caminhoArquivo}
         />
-        <CompileButton onCompile={handleCompile} />
         
-        {/* componentes com os dados do processador  */}
-        <div style={{ display: 'flex', justifyContent: 'right', marginRight: 'right'}}>
-          <CpuUsageComponent />
-          <MemoryUsageComponent/>
-        </div>
+        {/* Só mostra os botões padrão do C/C++ se NÃO estiver no modo de Threads do TCC */}
+        {!onChange && (
+          <>
+            <CompileButton onCompile={handleCompile} />
+            <div style={{ display: 'flex', justifyContent: 'right', marginRight: 'right'}}>
+              <CpuUsageComponent />
+              <MemoryUsageComponent/>
+            </div>
+          </>
+        )}
       </div>
       <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
         <MonacoEditor
           width="100%"
           height="calc(100vh - 400px)"
-          language={linguagemAtual} // <--- NOVA PARTE 3: Pinta a linguagem certa
+          language={linguagemAtual} 
           theme="vs-dark"
           value={conteudoArquivo}
           onChange={handleChange}
@@ -265,9 +268,13 @@ const MeuEditor = ({ idArquivo, atualizarCaminho }) => {
             selectOnLineNumbers: true,
           }}
         />
-        <div style={{ padding: "10px" }}>
-          <CompileResult compilationResult={compilationResult} />
-        </div>
+        {
+          !onChange && (
+          <div style={{ padding: "10px" }}>
+            <CompileResult compilationResult={compilationResult} />
+          </div>
+          )
+        }
       </div>
     </div>
   );
