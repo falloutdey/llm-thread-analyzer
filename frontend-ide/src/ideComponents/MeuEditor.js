@@ -70,16 +70,12 @@ const CompileResult = ({ compilationResult }) => {
                 Feedback da Análise de Threads:
               </Typography>
               
-              {/* Verifica se o backend devolveu erros de concorrência */}
               {compilationResult.issues && compilationResult.issues.length > 0 ? (
                 compilationResult.issues.map((issue, index) => (
                   <Box key={index} p={2} mt={1} style={{ backgroundColor: '#1e293b', borderRadius: '8px' }}>
-                     {/* Mensagem fria do SpotBugs */}
                     <Typography variant="body2" style={{ color: '#fca5a5', fontWeight: 'bold' }}>
                       Alerta Técnico (Linha {issue.lineNumber}): {issue.message}
                     </Typography>
-                    
-                    {/* Explicação didática do LLM */}
                     <Typography variant="body2" style={{ color: '#6ee7b7', marginTop: '8px', whiteSpace: 'pre-wrap' }}>
                       🤖 Professor LLM: {issue.interpretation}
                     </Typography>
@@ -105,7 +101,7 @@ const MeuEditor = ({ idArquivo, atualizarCaminho, onChange }) => {
   const [compilationResult, setCompilationResult] = useState(null);
 
   const obterLinguagem = () => {
-    if (!caminhoArquivo) return "java"; // Se não tiver caminho, assume Java para o seu TCC
+    if (!caminhoArquivo) return "java";
     const extensao = caminhoArquivo.toLowerCase();
     if (extensao.endsWith(".java")) return "java";
     if (extensao.endsWith(".c")) return "c";
@@ -116,6 +112,10 @@ const MeuEditor = ({ idArquivo, atualizarCaminho, onChange }) => {
   const linguagemAtual = obterLinguagem();
 
   useEffect(() => {
+    // Se tem onChange, é modo de digitação livre (ex: EditorJavaThreads).
+    // Não precisa carregar arquivo do servidor — evita erro ERR_CONNECTION_REFUSED.
+    if (onChange) return;
+
     const obterCaminhoArquivo = async (idArquivo) => {
       try {
         const response = await axios.get(
@@ -167,7 +167,7 @@ const MeuEditor = ({ idArquivo, atualizarCaminho, onChange }) => {
     return () => {
       window.removeEventListener("resize", handleResize);
     };
-  }, [idArquivo, atualizarCaminho]);
+  }, [idArquivo, atualizarCaminho, onChange]); // onChange adicionado nas dependências
 
   const handleChange = (newValue) => {
     setConteudoArquivo(newValue);
@@ -194,7 +194,6 @@ const MeuEditor = ({ idArquivo, atualizarCaminho, onChange }) => {
 
   const handleCompile = async () => {
     try {
-      // Se for Java, manda para o backend do seu TCC (Porta 8081)
       if (linguagemAtual === "java") {
         const response = await axios.post(`http://localhost:8081/api/files/analisar`, {
           fileName: "CodigoAluno.java",
@@ -202,9 +201,7 @@ const MeuEditor = ({ idArquivo, atualizarCaminho, onChange }) => {
         });
         setCompilationResult(response.data); 
         console.log("Análise Java recebida:", response.data);
-      } 
-      // Se for C ou C++, manda para o backend original (Porta 5000)
-      else {
+      } else {
         const response = await axios.post(`http://localhost:5000/api/compile`, {
           caminho: caminhoArquivo,
         });
@@ -212,7 +209,13 @@ const MeuEditor = ({ idArquivo, atualizarCaminho, onChange }) => {
         console.log("Resposta da compilação C/C++:", response.data);
       }
     } catch (error) {
-      setCompilationResult({ error: "Erro ao compilar e executar o arquivo." });
+      if (error.response && error.response.status === 400) {
+        setCompilationResult({ error: error.response.data });
+      } else if (error.response) {
+        setCompilationResult({ error: typeof error.response.data === 'string' ? error.response.data : "Erro interno no servidor." });
+      } else {
+        setCompilationResult({ error: "Erro de conexão. Verifica se o backend está rodando." });
+      }
       console.error("Erro ao analisar o código:", error);
     }
   };
@@ -234,7 +237,6 @@ const MeuEditor = ({ idArquivo, atualizarCaminho, onChange }) => {
           caminhoArquivo={caminhoArquivo}
         />
         
-        {/* Só mostra os botões padrão do C/C++ se NÃO estiver no modo de Threads do TCC */}
         {!onChange && (
           <>
             <CompileButton onCompile={handleCompile} />

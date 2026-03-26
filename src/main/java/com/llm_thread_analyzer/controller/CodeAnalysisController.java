@@ -11,7 +11,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/files")
-@CrossOrigin(origins = "*")
+// @CrossOrigin removido — CORS já está configurado globalmente no SecurityConfig.java
 public class CodeAnalysisController {
 
     @Autowired
@@ -35,17 +35,10 @@ public class CodeAnalysisController {
                     "Erro de Sintaxe! O teu código não compila. Por favor, corrige os seguintes erros antes de analisar as threads:\n\n" + detalhesErro
                 );
             }
-            // Código que compila mas não gera classes analisáveis (ex: só interfaces,
-            // código vazio) é culpa do input do aluno, HTTP 400, não HTTP 500.
-            // HTTP 500 indica falha do servidor; HTTP 400 indica input inválido (boas práticas REST).
             if (e.getMessage() != null && e.getMessage().startsWith("ERRO_ESTRUTURA:")) {
                 String detalhesErro = e.getMessage().replace("ERRO_ESTRUTURA:", "").trim();
                 return ResponseEntity.badRequest().body(detalhesErro);
             }
-            // e.getMessage() pode expor caminhos internos do servidor (ex: /var/tmp/thread-analyzer-...)
-            // ou detalhes de infraestrutura, OWASP A05 Sensitive Data Exposure.
-            // O detalhe técnico é registado no log do servidor para depuração,
-            // mas o cliente recebe apenas uma mensagem genérica e segura.
             System.err.println("[Controller] Erro interno em /analisar: " + e.getMessage());
             e.printStackTrace();
             return ResponseEntity.internalServerError().body(
