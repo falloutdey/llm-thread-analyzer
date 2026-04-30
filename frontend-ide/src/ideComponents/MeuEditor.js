@@ -1,282 +1,169 @@
-import React, { useState, useEffect } from "react";
-import MonacoEditor from "react-monaco-editor";
+import React, { useState, useEffect, useRef } from "react";
+import Editor from "@monaco-editor/react";
 import axios from "axios";
-import { Box } from "@mui/system";
-import Button from '@mui/material/Button';
-import { Typography } from '@mui/material';
 import MeuEditorSalvarButton from "./MeuEditorSalvarButton";
 import MeuEditorDownloadButton from "./MeuEditorDownloadButton";
-import Start from "./../img/start.png"
-import Home from "./../img/home.png"
-import styled from 'styled-components';
-import CpuUsageComponent from "./CpuUsageComponent";
-import { Link } from 'react-router-dom';
-import MemoryUsageComponent from "./MemoryUsageComponent";
 
-const StyledButton = styled(Button)`
-  &:hover {
-    background-color: #232226; 
-  }
-`;
-
-const CompileButton = ({ onCompile }) => {
-  return (
-    <StyledButton onClick={onCompile} >
-            <img style={{ maxWidth: '30%', height: 'auto' }}
-              src={Start}
-              alt="Executar"
-          />
-    </StyledButton>
-  );
-};
-
-const HomeButton = ({ onCompile }) => {
-  return (
-    <StyledButton onClick={onCompile} style={{ marginRight: '150px'}}>
-      <Link to="/homepage">
-            <img style={{ maxWidth: '30%', height: 'auto' }}
-              src={Home}
-              alt="Executar"
-          />
-      </Link>
-    </StyledButton>
-  );
-};
-
-const CompileResult = ({ compilationResult }) => {
-  return (
-    <Box mt={2}>
-      {compilationResult && (
-        <Box
-          p={2}
-          style={{
-            maxHeight: '280px',
-            overflowY: 'auto',
-            border: '1px solid #ccc',
-            borderRadius: '4px',
-            marginTop: '-20px',
-            borderColor: '#253342',
-            backgroundColor: '#253342',
-            color: '#ffffff'
-          }}
-        >
-          {compilationResult.error ? (
-            <Typography variant="body1" style={{ color: '#ef4444' }}>
-              {compilationResult.error}
-            </Typography>
-          ) : (
-            <>
-              <Typography variant="h6" style={{ color: '#ffffff', marginBottom: '10px' }}>
-                Feedback da Análise de Threads:
-              </Typography>
-              
-              {compilationResult.issues && compilationResult.issues.length > 0 ? (
-                compilationResult.issues.map((issue, index) => (
-                  <Box key={index} p={2} mt={1} style={{ backgroundColor: '#1e293b', borderRadius: '8px' }}>
-                    <Typography variant="body2" style={{ color: '#fca5a5', fontWeight: 'bold' }}>
-                      Alerta Técnico (Linha {issue.lineNumber}): {issue.message}
-                    </Typography>
-                    <Typography variant="body2" style={{ color: '#6ee7b7', marginTop: '8px', whiteSpace: 'pre-wrap' }}>
-                      🤖 Professor LLM: {issue.interpretation}
-                    </Typography>
-                  </Box>
-                ))
-              ) : (
-                <Typography variant="body2" style={{ color: '#a7f3d0' }}>
-                  Análise concluída: Nenhum problema de concorrência (threads) detetado no código!
-                </Typography>
-              )}
-            </>
-          )}
-        </Box>
-      )}
-    </Box>
-  );
-};
-
-const MeuEditor = ({ idArquivo, atualizarCaminho, onChange }) => {
+const MeuEditor = ({ idArquivo, atualizarCaminho, onChange, issues = [] }) => {
   const [conteudoArquivo, setConteudoArquivo] = useState("");
-  const [windowHeight, setWindowHeight] = useState(window.innerHeight);
-  const [caminhoArquivo, setCaminhoArquivo] = useState(null);
-  const [compilationResult, setCompilationResult] = useState(null);
+  const [caminhoArquivo, setCaminhoArquivo]   = useState(null);
+  const editorRef     = useRef(null); // instância do Monaco editor
+  const monacoRef     = useRef(null); // objeto monaco global
+  const decorationsRef = useRef([]);  // IDs das decorações atuais
 
   const obterLinguagem = () => {
     if (!caminhoArquivo) return "java";
-    const extensao = caminhoArquivo.toLowerCase();
-    if (extensao.endsWith(".java")) return "java";
-    if (extensao.endsWith(".c")) return "c";
-    if (extensao.endsWith(".cpp") || extensao.endsWith(".c++") || extensao.endsWith(".cc")) return "cpp";
-    return "java"; 
+    const ext = caminhoArquivo.toLowerCase();
+    if (ext.endsWith(".java")) return "java";
+    if (ext.endsWith(".c")) return "c";
+    if (ext.endsWith(".cpp") || ext.endsWith(".c++") || ext.endsWith(".cc")) return "cpp";
+    return "java";
   };
 
-  const linguagemAtual = obterLinguagem();
-
   useEffect(() => {
-    // Se tem onChange, é modo de digitação livre (ex: EditorJavaThreads).
-    // Não precisa carregar arquivo do servidor — evita erro ERR_CONNECTION_REFUSED.
     if (onChange) return;
-
-    const obterCaminhoArquivo = async (idArquivo) => {
+    const carregarArquivo = async () => {
       try {
-        const response = await axios.get(
-          `http://localhost:5000/api/arquivos/${idArquivo}/caminho`
-        );
-        return response.data.caminho;
-      } catch (error) {
-        console.error("Erro ao obter o caminho do arquivo:", error);
-        return null;
+        const res = await axios.get(`http://localhost:5000/api/arquivos/${idArquivo}/caminho`);
+        const caminho = res.data.caminho;
+        setCaminhoArquivo(caminho);
+        if (atualizarCaminho) atualizarCaminho(caminho);
+        const res2 = await axios.get(`http://localhost:5000/api/arquivos/conteudo`, { params: { caminho } });
+        setConteudoArquivo(res2.data.conteudo);
+      } catch (err) {
+        console.error("Erro ao carregar arquivo:", err);
       }
     };
+    if (idArquivo) carregarArquivo();
+  }, [idArquivo]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const obterConteudoArquivo = async (caminho) => {
-      try {
-        const response = await axios.get(
-          `http://localhost:5000/api/arquivos/conteudo`,
-          {
-            params: { caminho },
-          }
-        );
-        setConteudoArquivo(response.data.conteudo);
-        console.log("Conteúdo do arquivo obtido com sucesso!");
-      } catch (error) {
-        console.error("Erro ao obter o conteúdo do arquivo:", error);
-      }
-    };
+  // Aplica/remove highlights sempre que issues mudar
+  useEffect(() => {
+    if (!editorRef.current || !monacoRef.current) return;
+    const monaco = monacoRef.current;
+    const editor = editorRef.current;
 
-    const carregarArquivo = async (idArquivo) => {
-      const caminho = await obterCaminhoArquivo(idArquivo);
-      if (caminho) {
-        setCaminhoArquivo(caminho); 
-        atualizarCaminho(caminho); 
-        await obterConteudoArquivo(caminho);
-      }
-    };
+    const newDecorations = issues.map((issue, idx) => {
+      const isError = idx % 2 === 0; // alterna vermelho/âmbar igual ao IssueCard
+      return {
+        range: new monaco.Range(issue.lineNumber, 1, issue.lineNumber, 1),
+        options: {
+          isWholeLine: true,
+          // fundo da linha
+          className: isError ? 'monaco-error-line' : 'monaco-warn-line',
+          // ícone na gutter (margem esquerda)
+          glyphMarginClassName: isError ? 'monaco-gutter-error' : 'monaco-gutter-warn',
+          glyphMarginHoverMessage: { value: `⚠️ ${issue.message}` },
+          // tooltip ao passar o mouse na linha
+          hoverMessage: { value: `**Problema de concorrência** — Linha ${issue.lineNumber}\n\n${issue.message}` },
+          overviewRuler: {
+            color: isError ? '#ef4444' : '#f59e0b',
+            position: monaco.editor.OverviewRulerLane.Right,
+          },
+        },
+      };
+    });
 
-    if (idArquivo) {
-      carregarArquivo(idArquivo);
-    }
-
-    const handleResize = () => {
-      setTimeout(() => {
-        setWindowHeight(window.innerHeight);
-      }, 100); 
-    };
-
-    window.addEventListener("resize", handleResize);
-
-    return () => {
-      window.removeEventListener("resize", handleResize);
-    };
-  }, [idArquivo, atualizarCaminho, onChange]); // onChange adicionado nas dependências
+    // deltaDecorations substitui as anteriores e retorna novos IDs
+    decorationsRef.current = editor.deltaDecorations(
+      decorationsRef.current,
+      newDecorations
+    );
+  }, [issues]);
 
   const handleChange = (newValue) => {
-    setConteudoArquivo(newValue);
-    if(onChange) {
-      onChange(newValue);
-    }
+    setConteudoArquivo(newValue ?? "");
+    if (onChange) onChange(newValue ?? "");
   };
 
   const handleSave = async () => {
+    if (!caminhoArquivo) return;
     try {
-      if (caminhoArquivo) {
-        await axios.put(`http://localhost:8081/api/files/arquivos/conteudo`, {
-          caminho: caminhoArquivo,
-          conteudo: conteudoArquivo,
-        });
-        console.log("Arquivo salvo com sucesso!");
-      } else {
-        console.error("Caminho do arquivo não definido.");
-      }
-    } catch (error) {
-      console.error("Erro ao salvar o conteúdo do arquivo:", error);
+      await axios.put(`http://localhost:8081/api/files/arquivos/conteudo`, {
+        caminho: caminhoArquivo,
+        conteudo: conteudoArquivo,
+      });
+    } catch (err) {
+      console.error("Erro ao salvar:", err);
     }
   };
 
-  const handleCompile = async () => {
-    try {
-      if (linguagemAtual === "java") {
-        const response = await axios.post(`http://localhost:8081/api/files/analisar`, {
-          fileName: "CodigoAluno.java",
-          content: conteudoArquivo,     
-        });
-        setCompilationResult(response.data); 
-        console.log("Análise Java recebida:", response.data);
-      } else {
-        const response = await axios.post(`http://localhost:5000/api/compile`, {
-          caminho: caminhoArquivo,
-        });
-        setCompilationResult(response.data); 
-        console.log("Resposta da compilação C/C++:", response.data);
-      }
-    } catch (error) {
-      if (error.response && error.response.status === 400) {
-        setCompilationResult({ error: error.response.data });
-      } else if (error.response) {
-        setCompilationResult({ error: typeof error.response.data === 'string' ? error.response.data : "Erro interno no servidor." });
-      } else {
-        setCompilationResult({ error: "Erro de conexão. Verifica se o backend está rodando." });
-      }
-      console.error("Erro ao analisar o código:", error);
+  const handleMount = (editor, monaco) => {
+    editorRef.current  = editor;
+    monacoRef.current  = monaco;
+
+    // Injeta CSS das decorações uma única vez
+    const styleId = 'monaco-concurrency-decorations';
+    if (!document.getElementById(styleId)) {
+      const style = document.createElement('style');
+      style.id = styleId;
+      style.textContent = `
+        /* Fundo da linha com erro */
+        .monaco-error-line {
+          background: rgba(239, 68, 68, 0.12) !important;
+          border-left: 3px solid #ef4444 !important;
+        }
+        /* Fundo da linha com aviso */
+        .monaco-warn-line {
+          background: rgba(245, 158, 11, 0.10) !important;
+          border-left: 3px solid #f59e0b !important;
+        }
+        /* Ícone de erro na gutter */
+        .monaco-gutter-error::before {
+          content: '●';
+          color: #ef4444;
+          font-size: 10px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          height: 100%;
+        }
+        /* Ícone de aviso na gutter */
+        .monaco-gutter-warn::before {
+          content: '●';
+          color: #f59e0b;
+          font-size: 10px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          height: 100%;
+        }
+      `;
+      document.head.appendChild(style);
     }
   };
 
   return (
-    <div
-      style={{
-        height: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        background: "#253342",
-      }}
-    >
-      <div style={{ display: "flex", background: "#3e5954", padding: "10px", justifyContent: 'center', alignItems: 'center'}}>
-        {/* <HomeButton/> */}
-        <MeuEditorSalvarButton onClick={handleSave} />
-        <MeuEditorDownloadButton
-          conteudo={conteudoArquivo}
-          caminhoArquivo={caminhoArquivo}
-        />
-        
-        {!onChange && (
-          <>
-            <CompileButton onCompile={handleCompile} />
-            <div style={{ display: 'flex', justifyContent: 'right', marginRight: 'right'}}>
-              <CpuUsageComponent />
-              <MemoryUsageComponent/>
-            </div>
-          </>
-        )}
-      </div>
-      <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-        <MonacoEditor
-          width="100%"
-          height="calc(100vh - 400px)"
-          language={linguagemAtual} 
+    <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "#0d1117" }}>
+      {!onChange && (
+        <div style={{ display: "flex", background: "#161b22", padding: "6px 10px", gap: 4, borderBottom: "1px solid #2a3441" }}>
+          <MeuEditorSalvarButton onClick={handleSave} />
+          <MeuEditorDownloadButton conteudo={conteudoArquivo} caminhoArquivo={caminhoArquivo} />
+        </div>
+      )}
+
+      <div style={{ flex: 1, overflow: "hidden" }}>
+        <Editor
+          height="100%"
+          language={obterLinguagem()}
           theme="vs-dark"
           value={conteudoArquivo}
           onChange={handleChange}
+          onMount={handleMount}
           options={{
             lineNumbers: "on",
+            glyphMargin: true,      // habilita a coluna de ícones na gutter
             roundedSelection: false,
             scrollBeyondLastLine: false,
             readOnly: false,
-            theme: "vs-dark",
             wordWrap: "on",
-            handleMouseWheel: true,
-            scrollbar: {
-              vertical: "visible",
-              horizontal: "visible",
-            },
+            minimap: { enabled: true },
+            fontSize: 13,
+            fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+            scrollbar: { vertical: "visible", horizontal: "visible" },
             selectOnLineNumbers: true,
           }}
         />
-        {
-          !onChange && (
-          <div style={{ padding: "10px" }}>
-            <CompileResult compilationResult={compilationResult} />
-          </div>
-          )
-        }
       </div>
     </div>
   );

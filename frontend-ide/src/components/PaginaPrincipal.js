@@ -694,8 +694,17 @@ const features = [
    COMPONENTE
 ══════════════════════════════════════════ */
 function PaginaPrincipal() {
-  const [isDark, setIsDark] = useState(true);
+  const [isDark, setIsDark] = useState(() => {
+    const saved = localStorage.getItem('sumawma-theme');
+    return saved ? saved === 'dark' : true;
+  });
   const theme = isDark ? darkTheme : lightTheme;
+
+  const toggleTheme = () => {
+    const next = !isDark;
+    setIsDark(next);
+    localStorage.setItem('sumawma-theme', next ? 'dark' : 'light');
+  };
 
   return (
     <ThemeProvider theme={theme}>
@@ -713,9 +722,9 @@ function PaginaPrincipal() {
               </div>
             </LogoArea>
             <HeaderRight>
-              <ToggleBtn onClick={() => setIsDark(v => !v)}>
+              <ToggleBtn onClick={toggleTheme}>
                 {isDark ? '☀️' : '🌙'}
-                {isDark ? 'Modo claro' : 'Modo escuro'}
+                {isDark ? ' Modo claro' : ' Modo escuro'}
               </ToggleBtn>
               <NavLink to="/login">Entrar</NavLink>
               <NavBtn to="/registro">Criar conta grátis</NavBtn>
