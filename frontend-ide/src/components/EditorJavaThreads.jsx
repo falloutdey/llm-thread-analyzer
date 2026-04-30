@@ -54,17 +54,9 @@ const slideIn = keyframes`
   from { opacity: 0; transform: translateX(12px); }
   to   { opacity: 1; transform: translateX(0); }
 `;
-const fadeIn = keyframes`
-  from { opacity: 0; }
-  to   { opacity: 1; }
-`;
-const spin = keyframes`
-  to { transform: rotate(360deg); }
-`;
-const pulse = keyframes`
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.35; }
-`;
+const fadeIn = keyframes`from { opacity: 0; } to { opacity: 1; }`;
+const spin = keyframes`to { transform: rotate(360deg); }`;
+const pulse = keyframes`0%, 100% { opacity: 1; } 50% { opacity: 0.35; }`;
 
 const Shell = styled.div`
   height: 100vh; display: flex; flex-direction: column;
@@ -82,13 +74,11 @@ const Titlebar = styled.div`
 
 const TitleDots = styled.div`display: flex; gap: 6px;`;
 const Dot = styled.div`width: 12px; height: 12px; border-radius: 50%; background: ${p => p.color};`;
-
 const BrandArea = styled.div`display: flex; align-items: center; gap: 7px; flex-shrink: 0;`;
 const BrandName = styled.span`
   font-size: 12px; font-weight: 700; color: #22d3ee;
   letter-spacing: 0.12em; text-transform: uppercase;
 `;
-
 const TitleText = styled.span`
   flex: 1; text-align: center; font-size: 12px; color: ${p => p.theme.textDim};
   letter-spacing: 0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -120,7 +110,26 @@ const SpinnerEl = styled.div`
   border-radius: 50%; animation: ${spin} 0.7s linear infinite;
 `;
 
-const Body = styled.div`flex: 1; display: flex; overflow: hidden; min-height: 0;`;
+const Body = styled.div`
+  flex: 1; display: flex; overflow: hidden; min-height: 0; position: relative;
+`;
+
+/* Botão flutuante — sempre visível mesmo com sidebar fechada */
+const SidebarToggleFloat = styled.button`
+  position: absolute;
+  left: ${p => p.$open ? 'calc(var(--sidebar-width, 18%) - 11px)' : '0px'};
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px; height: 22px; border-radius: 50%;
+  background: ${p => p.theme.bg2};
+  border: 1px solid ${p => p.theme.borderHov};
+  cursor: pointer; color: ${p => p.theme.textSec};
+  display: flex; align-items: center; justify-content: center;
+  z-index: 30; padding: 0;
+  transition: background 0.15s, color 0.15s, left 0.2s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  &:hover { background: ${p => p.theme.accent}; color: #fff; border-color: ${p => p.theme.accent}; }
+`;
 
 const SidebarInner = styled.div`
   height: 100%; background: ${p => p.theme.bg1};
@@ -287,108 +296,36 @@ const AlertCard = styled.div`
 `;
 
 const AlertHeader = styled.div`display: flex; align-items: center; gap: 8px; margin-bottom: 10px;`;
-
-const AlertIcon = styled.div`
-  width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-`;
-
-const AlertTitle = styled.span`
-  font-size: 12px; font-weight: 600;
-  color: ${p => p.$color === 'red' ? '#fca5a5' : '#fcd34d'}; letter-spacing: 0.03em;
-`;
-
-const AlertSubtitle = styled.div`
-  font-size: 12px;
-  color: ${p => p.$color === 'red' ? 'rgba(252,165,165,0.7)' : 'rgba(252,211,77,0.7)'}; margin-top: 2px;
-`;
-
+const AlertIcon = styled.div`width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;`;
+const AlertTitle = styled.span`font-size: 12px; font-weight: 600; color: ${p => p.$color === 'red' ? '#fca5a5' : '#fcd34d'}; letter-spacing: 0.03em;`;
+const AlertSubtitle = styled.div`font-size: 12px; color: ${p => p.$color === 'red' ? 'rgba(252,165,165,0.7)' : 'rgba(252,211,77,0.7)'}; margin-top: 2px;`;
 const SectionBlock = styled.div`margin-bottom: 10px;`;
-
-const SectionLabel = styled.div`
-  display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600;
-  color: ${p => p.theme.textSec}; margin-bottom: 5px;
-`;
-
-const SectionText = styled.div`
-  font-size: 12px; color: ${p => p.$green ? p.theme.green : p.theme.textSec};
-  line-height: 1.65; font-family: ${p => p.$sans ? 'system-ui, sans-serif' : 'inherit'}; white-space: pre-wrap;
-`;
-
-const FixItem = styled.div`
-  display: flex; align-items: flex-start; gap: 6px; font-size: 12px;
-  color: ${p => p.theme.textSec}; line-height: 1.5; margin-bottom: 4px; font-family: system-ui, sans-serif;
-`;
-
-const FixDot = styled.div`
-  width: 15px; height: 15px; border-radius: 50%;
-  background: ${p => p.theme.greenBg}; border: 1px solid ${p => p.theme.green};
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px;
-`;
-
+const SectionLabel = styled.div`display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: ${p => p.theme.textSec}; margin-bottom: 5px;`;
+const SectionText = styled.div`font-size: 12px; color: ${p => p.$green ? p.theme.green : p.theme.textSec}; line-height: 1.65; font-family: ${p => p.$sans ? 'system-ui, sans-serif' : 'inherit'}; white-space: pre-wrap;`;
+const FixItem = styled.div`display: flex; align-items: flex-start; gap: 6px; font-size: 12px; color: ${p => p.theme.textSec}; line-height: 1.5; margin-bottom: 4px; font-family: system-ui, sans-serif;`;
+const FixDot = styled.div`width: 15px; height: 15px; border-radius: 50%; background: ${p => p.theme.greenBg}; border: 1px solid ${p => p.theme.green}; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px;`;
 const Divider = styled.div`height: 1px; background: ${p => p.theme.border}; margin: 8px 0;`;
-
-const SuccessCard = styled.div`
-  background: ${p => p.theme.greenBg}; border: 1px solid rgba(16,185,129,0.25);
-  border-left: 3px solid ${p => p.theme.green}; border-radius: 0 6px 6px 0;
-  padding: 14px; animation: ${fadeIn} 0.3s ease;
-`;
-
-const EmptyState = styled.div`
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  height: 100%; gap: 10px; color: ${p => p.theme.textDim}; font-size: 12px;
-  text-align: center; padding: 20px; line-height: 1.7;
-`;
+const SuccessCard = styled.div`background: ${p => p.theme.greenBg}; border: 1px solid rgba(16,185,129,0.25); border-left: 3px solid ${p => p.theme.green}; border-radius: 0 6px 6px 0; padding: 14px; animation: ${fadeIn} 0.3s ease;`;
+const EmptyState = styled.div`display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 10px; color: ${p => p.theme.textDim}; font-size: 12px; text-align: center; padding: 20px; line-height: 1.7;`;
 
 const WelcomeScreen = styled.div`
   flex: 1; width: 100%; height: 100%; display: flex; flex-direction: column;
   align-items: center; justify-content: center; background: ${p => p.theme.bg0};
   gap: 28px; user-select: none; position: relative; overflow: hidden;
 `;
-
-const WelcomeBgLogo = styled.img`
-  position: absolute; width: 340px;
-  opacity: ${p => p.theme.mode === 'dark' ? 0.055 : 0.07};
-  pointer-events: none; user-select: none;
-  filter: ${p => p.theme.mode === 'light' ? 'saturate(0.5)' : 'saturate(0.4)'};
-`;
-
-const WelcomeBrand = styled.div`
-  display: flex; flex-direction: column; align-items: center; gap: 8px; position: relative;
-`;
-
-const WelcomeBrandName = styled.div`
-  font-size: 24px; font-weight: 700; letter-spacing: 0.18em; color: #22d3ee; text-transform: uppercase;
-`;
-
+const WelcomeBgLogo = styled.img`position: absolute; width: 340px; opacity: ${p => p.theme.mode === 'dark' ? 0.055 : 0.07}; pointer-events: none; user-select: none; filter: ${p => p.theme.mode === 'light' ? 'saturate(0.5)' : 'saturate(0.4)'};`;
+const WelcomeBrand = styled.div`display: flex; flex-direction: column; align-items: center; gap: 8px; position: relative;`;
+const WelcomeBrandName = styled.div`font-size: 24px; font-weight: 700; letter-spacing: 0.18em; color: #22d3ee; text-transform: uppercase;`;
 const WelcomeBrandSub = styled.div`font-size: 12px; color: ${p => p.theme.textDim}; letter-spacing: 0.06em;`;
-
-const WelcomeGrid = styled.div`
-  display: flex; flex-direction: column; gap: 8px; min-width: 300px; position: relative;
-`;
-
-const WelcomeItem = styled.div`
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 11px 16px; background: ${p => p.theme.bg1}; border: 1px solid ${p => p.theme.border};
-  border-radius: 7px; cursor: pointer; transition: border-color 0.15s, background 0.15s;
-  &:hover { background: ${p => p.theme.bg2}; border-color: ${p => p.theme.borderHov}; }
-`;
-
-const WelcomeItemLabel = styled.span`
-  font-size: 13px; color: ${p => p.theme.textSec}; display: flex; align-items: center; gap: 9px;
-`;
-
-const WelcomeKbd = styled.kbd`
-  font-size: 11px; color: ${p => p.theme.textDim}; background: ${p => p.theme.bg3};
-  border: 1px solid ${p => p.theme.border}; border-radius: 4px; padding: 2px 8px;
-  font-family: 'JetBrains Mono', monospace;
-`;
+const WelcomeGrid = styled.div`display: flex; flex-direction: column; gap: 8px; min-width: 300px; position: relative;`;
+const WelcomeItem = styled.div`display: flex; align-items: center; justify-content: space-between; padding: 11px 16px; background: ${p => p.theme.bg1}; border: 1px solid ${p => p.theme.border}; border-radius: 7px; cursor: pointer; transition: border-color 0.15s, background 0.15s; &:hover { background: ${p => p.theme.bg2}; border-color: ${p => p.theme.borderHov}; }`;
+const WelcomeItemLabel = styled.span`font-size: 13px; color: ${p => p.theme.textSec}; display: flex; align-items: center; gap: 9px;`;
+const WelcomeKbd = styled.kbd`font-size: 11px; color: ${p => p.theme.textDim}; background: ${p => p.theme.bg3}; border: 1px solid ${p => p.theme.border}; border-radius: 4px; padding: 2px 8px; font-family: 'JetBrains Mono', monospace;`;
 
 const SaveIndicator = styled.div`
   position: absolute; top: 12px; right: 18px; font-size: 12px; font-weight: 500;
   color: ${p => p.$saved ? p.theme.green : p.theme.amber};
-  background: ${p => p.$saved
-    ? (p.theme.mode === 'dark' ? 'rgba(16,185,129,0.12)' : 'rgba(5,150,105,0.1)')
-    : (p.theme.mode === 'dark' ? 'rgba(245,158,11,0.12)' : 'rgba(217,119,6,0.1)')};
+  background: ${p => p.$saved ? (p.theme.mode === 'dark' ? 'rgba(16,185,129,0.12)' : 'rgba(5,150,105,0.1)') : (p.theme.mode === 'dark' ? 'rgba(245,158,11,0.12)' : 'rgba(217,119,6,0.1)')};
   border: 1px solid ${p => p.$saved ? p.theme.green : p.theme.amber};
   border-radius: 5px; padding: 4px 10px; display: flex; align-items: center; gap: 5px;
   opacity: ${p => p.$visible ? 1 : 0}; transition: opacity 0.4s; pointer-events: none; z-index: 5;
@@ -402,21 +339,14 @@ const TerminalWrapper = styled.div`
 `;
 
 const TermLine = styled.div`
-  color: ${p =>
-    p.$type === 'prompt' ? '#4ade80' :
-    p.$type === 'error'  ? p.theme.red :
-    p.$type === 'warn'   ? p.theme.amber :
-    p.$type === 'ok'     ? p.theme.green :
-    p.theme.textDim};
+  color: ${p => p.$type === 'prompt' ? '#4ade80' : p.$type === 'error' ? p.theme.red : p.$type === 'warn' ? p.theme.amber : p.$type === 'ok' ? p.theme.green : p.theme.textDim};
 `;
 
 const Statusbar = styled.div`
-  height: 24px; background: ${p => p.theme.statusBg}; display: flex; align-items: center;
-  padding: 0 14px; gap: 16px; flex-shrink: 0;
+  height: 24px; background: ${p => p.theme.statusBg}; display: flex;
+  align-items: center; padding: 0 14px; gap: 16px; flex-shrink: 0;
 `;
-
 const SbItem = styled.span`font-size: 11px; color: rgba(255,255,255,${p => p.$dim ? '0.65' : '1'});`;
-
 const SbAlert = styled.span`font-size: 11px; color: #fff; display: flex; align-items: center; gap: 4px;`;
 
 /* ════════════════════════════════
@@ -511,13 +441,11 @@ const SidebarTree = ({ tree, setTree, activeFileId, setActiveFileId, onStartCrea
   const inputRef = useRef(null);
 
   useEffect(() => { if (inputRef.current) inputRef.current.focus(); }, [editingId, creatingIn]);
-
   useEffect(() => {
     const close = () => setCtxMenu(null);
     window.addEventListener('click', close);
     return () => window.removeEventListener('click', close);
   }, []);
-
   useEffect(() => { if (onStartCreate) onStartCreate.current = startCreate; }); // eslint-disable-line
 
   const startCreate = (parentId, type) => {
@@ -541,13 +469,11 @@ const SidebarTree = ({ tree, setTree, activeFileId, setActiveFileId, onStartCrea
     if (editValue.trim()) setTree(t => updateNode(t, id, n => ({ ...n, name: editValue.trim() })));
     setEditingId(null);
   };
-
   const deleteNode = (id) => {
     setTree(t => removeNode(t, id));
     if (activeFileId === id) setActiveFileId(null);
     setCtxMenu(null);
   };
-
   const toggleExpand = (id) => setTree(t => updateNode(t, id, n => ({ ...n, expanded: !n.expanded })));
   const onCtxMenu = (e, node) => { e.preventDefault(); e.stopPropagation(); setCtxMenu({ x: e.clientX, y: e.clientY, node }); };
 
@@ -653,15 +579,11 @@ const SidebarTree = ({ tree, setTree, activeFileId, setActiveFileId, onStartCrea
             </>
           )}
           <CtxItem theme={theme} onClick={() => startRename(ctxMenu.node)}>
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M2 9.5h2l4.5-4.5-2-2L2 7.5v2z" strokeLinejoin="round"/>
-            </svg>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 9.5h2l4.5-4.5-2-2L2 7.5v2z" strokeLinejoin="round"/></svg>
             Renomear
           </CtxItem>
           <CtxItem theme={theme} $danger onClick={() => deleteNode(ctxMenu.node.id)}>
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M2 3h8M5 3V2h2v1M4 3l.5 7h3L8 3" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 3h8M5 3V2h2v1M4 3l.5 7h3L8 3" strokeLinecap="round" strokeLinejoin="round"/></svg>
             Excluir
           </CtxItem>
         </CtxMenu>
@@ -746,9 +668,7 @@ const EditorJavaThreads = () => {
   };
 
   useEffect(() => {
-    const onStorage = (e) => {
-      if (e.key === 'sumawma-theme') setIsDark(e.newValue === 'dark');
-    };
+    const onStorage = (e) => { if (e.key === 'sumawma-theme') setIsDark(e.newValue === 'dark'); };
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
   }, []);
@@ -771,8 +691,8 @@ const EditorJavaThreads = () => {
   const autosaveTimer    = useRef(null);
   const saveVisibleTimer = useRef(null);
   const startCreateRef   = useRef(null);
-  // ref para acessar analisarCodigo dentro do useEffect do Ctrl+Enter
   const analisarRef      = useRef(null);
+  const sidebarPanelRef  = useRef(null);
 
   const activeFile = flatFiles(tree).find(f => f.id === activeFileId) || null;
   const nomeArquivoAtivo = activeFile?.name || null;
@@ -817,7 +737,7 @@ const EditorJavaThreads = () => {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  // ── NOVO: Ctrl+Enter dispara análise ──
+  // Ctrl+Enter
   useEffect(() => {
     const handler = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
@@ -867,9 +787,7 @@ const EditorJavaThreads = () => {
     } finally { setIsAnalisando(false); }
   };
 
-  // Mantém a ref sempre atualizada com a versão mais recente de analisarCodigo
   useEffect(() => { analisarRef.current = analisarCodigo; });
-
   useEffect(() => { if (feedbackRef.current) feedbackRef.current.scrollTop = 0; }, [resultadoAnalise]);
 
   const renderFeedback = () => {
@@ -928,10 +846,30 @@ const EditorJavaThreads = () => {
         </Titlebar>
 
         <Body>
+          {/* Botão flutuante — sempre visível mesmo com sidebar fechada */}
+          <SidebarToggleFloat
+            theme={theme}
+            $open={sidebarOpen}
+            onClick={() => {
+              if (sidebarOpen) sidebarPanelRef.current?.collapse();
+              else sidebarPanelRef.current?.expand();
+            }}
+            title={sidebarOpen ? 'Recolher sidebar' : 'Expandir sidebar'}
+          >
+            <svg width="10" height="10" viewBox="0 0 14 14" fill="none"
+              style={{ transform: sidebarOpen ? 'none' : 'scaleX(-1)', transition: 'transform 0.2s' }}>
+              <path d="M9 3L5 7L9 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </SidebarToggleFloat>
+
           <PanelGroup direction="horizontal" style={{ flex: 1, overflow: 'hidden' }}>
 
-            <Panel defaultSize={18} minSize={10} maxSize={35} collapsible
-              onCollapse={() => setSidebarOpen(false)} onExpand={() => setSidebarOpen(true)}
+            <Panel
+              ref={sidebarPanelRef}
+              defaultSize={18} minSize={10} maxSize={35}
+              collapsible collapsedSize={0}
+              onCollapse={() => setSidebarOpen(false)}
+              onExpand={() => setSidebarOpen(true)}
               style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}
             >
               <SidebarInner>
@@ -946,12 +884,6 @@ const EditorJavaThreads = () => {
                       <IconBtn $open title="Nova pasta" onClick={() => startCreateRef.current?.('root', 'folder')}><IcoNewFolder /></IconBtn>
                     </>
                   )}
-                  <CollapseBtn onClick={() => setSidebarOpen(v => !v)} title={sidebarOpen ? 'Recolher' : 'Expandir'}>
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
-                      style={{ transform: sidebarOpen ? 'none' : 'scaleX(-1)', transition: 'transform 0.2s' }}>
-                      <path d="M9 3L5 7L9 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </CollapseBtn>
                 </SidebarHeader>
                 <SidebarContent $open={sidebarOpen}>
                   <SidebarTree
@@ -989,7 +921,6 @@ const EditorJavaThreads = () => {
                           <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
                             <circle cx="6" cy="6" r="5"/><path d="M6 4v3M6 8.5v.5" strokeLinecap="round"/>
                           </svg>
-                          {/* ── NOVO: hint atualizado ── */}
                           Autosave ativo · Ctrl+S salvar · Ctrl+Enter analisar
                         </WelcomeItemLabel>
                       </WelcomeItem>
@@ -1008,7 +939,6 @@ const EditorJavaThreads = () => {
                         }
                       </SaveIndicator>
                       <div key={editorKey} style={{ height: '100%' }}>
-                        {/* ── NOVO: prop issues passada para o MeuEditor ── */}
                         <MeuEditor
                           idArquivo={idArquivo}
                           atualizarCaminho={() => {}}
