@@ -4,8 +4,8 @@ import axios from "axios";
 import MeuEditorSalvarButton from "./MeuEditorSalvarButton";
 import MeuEditorDownloadButton from "./MeuEditorDownloadButton";
 
-const MeuEditor = ({ idArquivo, atualizarCaminho, onChange, issues = [] }) => {
-  const [conteudoArquivo, setConteudoArquivo] = useState("");
+const MeuEditor = ({ idArquivo, atualizarCaminho, onChange, issues = [], initialValue = "", isDark = true }) => {
+  const [conteudoArquivo, setConteudoArquivo] = useState(initialValue);
   const [caminhoArquivo, setCaminhoArquivo]   = useState(null);
   const editorRef     = useRef(null); // instância do Monaco editor
   const monacoRef     = useRef(null); // objeto monaco global
@@ -88,9 +88,17 @@ const MeuEditor = ({ idArquivo, atualizarCaminho, onChange, issues = [] }) => {
     }
   };
 
+  // Troca tema do Monaco quando isDark muda
+  useEffect(() => {
+    if (!monacoRef.current) return;
+    monacoRef.current.editor.setTheme(isDark ? 'vs-dark' : 'vs');
+  }, [isDark]);
+
   const handleMount = (editor, monaco) => {
     editorRef.current  = editor;
     monacoRef.current  = monaco;
+    // Aplica tema correto imediatamente ao montar
+    monaco.editor.setTheme(isDark ? 'vs-dark' : 'vs');
 
     // Injeta CSS das decorações uma única vez
     const styleId = 'monaco-concurrency-decorations';
@@ -134,7 +142,7 @@ const MeuEditor = ({ idArquivo, atualizarCaminho, onChange, issues = [] }) => {
   };
 
   return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "#0d1117" }}>
+    <div style={{ height: "100%", display: "flex", flexDirection: "column", background: isDark ? "#0d1117" : "#ffffff" }}>
       {!onChange && (
         <div style={{ display: "flex", background: "#161b22", padding: "6px 10px", gap: 4, borderBottom: "1px solid #2a3441" }}>
           <MeuEditorSalvarButton onClick={handleSave} />
@@ -146,7 +154,7 @@ const MeuEditor = ({ idArquivo, atualizarCaminho, onChange, issues = [] }) => {
         <Editor
           height="100%"
           language={obterLinguagem()}
-          theme="vs-dark"
+          theme={isDark ? "vs-dark" : "vs"}
           value={conteudoArquivo}
           onChange={handleChange}
           onMount={handleMount}
@@ -158,7 +166,7 @@ const MeuEditor = ({ idArquivo, atualizarCaminho, onChange, issues = [] }) => {
             readOnly: false,
             wordWrap: "on",
             minimap: { enabled: true },
-            fontSize: 13,
+            fontSize: 15,
             fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
             scrollbar: { vertical: "visible", horizontal: "visible" },
             selectOnLineNumbers: true,

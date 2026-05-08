@@ -76,18 +76,18 @@ const TitleDots = styled.div`display: flex; gap: 6px;`;
 const Dot = styled.div`width: 12px; height: 12px; border-radius: 50%; background: ${p => p.color};`;
 const BrandArea = styled.div`display: flex; align-items: center; gap: 7px; flex-shrink: 0;`;
 const BrandName = styled.span`
-  font-size: 12px; font-weight: 700; color: #22d3ee;
+  font-size: 14px; font-weight: 700; color: #22d3ee;
   letter-spacing: 0.12em; text-transform: uppercase;
 `;
 const TitleText = styled.span`
-  flex: 1; text-align: center; font-size: 12px; color: ${p => p.theme.textDim};
+  flex: 1; text-align: center; font-size: 13px; color: ${p => p.theme.textDim};
   letter-spacing: 0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 `;
 
 const RunButton = styled.button`
   display: flex; align-items: center; gap: 7px; padding: 7px 18px;
   background: ${p => p.$running ? p.theme.bg3 : p.theme.accent};
-  color: #fff; border: none; border-radius: 6px; font-size: 12px;
+  color: #fff; border: none; border-radius: 6px; font-size: 13px;
   font-family: 'JetBrains Mono', monospace; font-weight: 500;
   cursor: ${p => p.$running ? 'not-allowed' : 'pointer'};
   transition: background 0.15s; letter-spacing: 0.02em; white-space: nowrap; flex-shrink: 0;
@@ -98,7 +98,7 @@ const ThemeBtn = styled.button`
   display: flex; align-items: center; gap: 5px; padding: 5px 10px;
   background: ${p => p.theme.bg3}; color: ${p => p.theme.textSec};
   border: 1px solid ${p => p.theme.border}; border-radius: 5px;
-  font-size: 11px; font-family: 'JetBrains Mono', monospace;
+  font-size: 12px; font-family: 'JetBrains Mono', monospace;
   cursor: pointer; white-space: nowrap; flex-shrink: 0;
   transition: background 0.15s, color 0.15s;
   &:hover { background: ${p => p.theme.bg2}; color: ${p => p.theme.textPri}; }
@@ -111,23 +111,41 @@ const SpinnerEl = styled.div`
 `;
 
 const Body = styled.div`
-  flex: 1; display: flex; overflow: hidden; min-height: 0; position: relative;
+  flex: 1; display: flex; overflow: hidden; min-height: 0;
 `;
 
-/* Botão flutuante — sempre visível mesmo com sidebar fechada */
-const SidebarToggleFloat = styled.button`
-  position: absolute;
-  left: ${p => p.$open ? 'calc(var(--sidebar-width, 18%) - 11px)' : '0px'};
-  top: 50%;
-  transform: translateY(-50%);
-  width: 22px; height: 22px; border-radius: 50%;
+/* Handle redimensionável com botão de colapso embutido */
+const CollapseHandle = styled(PanelResizeHandle)`
+  width: 12px;
+  background: transparent;
+  cursor: col-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  position: relative;
+  transition: background 0.15s;
+  &::before {
+    content: '';
+    position: absolute;
+    left: 5px;
+    top: 0; bottom: 0;
+    width: 1px;
+    background: ${p => p.theme.border};
+    transition: background 0.15s;
+  }
+  &:hover::before { background: ${p => p.theme.accent}; }
+`;
+
+const CollapseHandleBtn = styled.button`
+  width: 20px; height: 20px; border-radius: 50%;
   background: ${p => p.theme.bg2};
   border: 1px solid ${p => p.theme.borderHov};
   cursor: pointer; color: ${p => p.theme.textSec};
   display: flex; align-items: center; justify-content: center;
-  z-index: 30; padding: 0;
-  transition: background 0.15s, color 0.15s, left 0.2s;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  z-index: 30; padding: 0; flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.35);
   &:hover { background: ${p => p.theme.accent}; color: #fff; border-color: ${p => p.theme.accent}; }
 `;
 
@@ -175,15 +193,11 @@ const SidebarContent = styled.div`
 `;
 
 const EmptySidebar = styled.div`
-  padding: 20px 14px; font-size: 12px; color: ${p => p.theme.textDim};
+  padding: 20px 14px; font-size: 13px; color: ${p => p.theme.textDim};
   line-height: 1.7; text-align: center;
 `;
 
-const ResizeHandle = styled(PanelResizeHandle)`
-  width: 5px; background: ${p => p.theme.border}; cursor: col-resize;
-  transition: background 0.15s;
-  &:hover { background: ${p => p.theme.accent}; }
-`;
+
 
 const TreeRow = styled.div`
   display: flex; align-items: center; gap: 5px;
@@ -248,19 +262,33 @@ const TabBar = styled.div`
   &::-webkit-scrollbar { display: none; }
 `;
 
-const Tab = styled.div`
-  height: 34px; padding: 0 18px; display: flex; align-items: center; font-size: 13px;
-  color: ${p => p.$active ? p.theme.textPri : p.theme.textDim};
-  background: ${p => p.$active ? p.theme.bg0 : 'transparent'};
-  border-right: 1px solid ${p => p.theme.border};
-  border-top: ${p => p.$active ? `2px solid ${p.theme.accent}` : '2px solid transparent'};
-  cursor: pointer; white-space: nowrap; gap: 8px; transition: color 0.1s;
-  &:hover { color: ${p => p.theme.textSec}; }
-`;
+
 
 const TabDot = styled.div`
   width: 7px; height: 7px; border-radius: 50%; background: ${p => p.theme.amber};
   animation: ${pulse} 2s ease-in-out infinite;
+  flex-shrink: 0;
+`;
+
+const TabCloseBtn = styled.button`
+  width: 18px; height: 18px; border-radius: 3px;
+  display: flex; align-items: center; justify-content: center;
+  background: none; border: none; cursor: pointer;
+  color: ${p => p.theme.textDim}; padding: 0; flex-shrink: 0;
+  opacity: 0; transition: opacity 0.15s, background 0.15s, color 0.15s;
+  margin-left: 4px;
+  &:hover { background: ${p => p.theme.bg3}; color: ${p => p.theme.textPri}; }
+`;
+
+const Tab = styled.div`
+  height: 34px; padding: 0 12px 0 16px; display: flex; align-items: center; font-size: 13px;
+  color: ${p => p.$active ? p.theme.textPri : p.theme.textDim};
+  background: ${p => p.$active ? p.theme.bg0 : 'transparent'};
+  border-right: 1px solid ${p => p.theme.border};
+  border-top: ${p => p.$active ? `2px solid ${p.theme.accent}` : '2px solid transparent'};
+  cursor: pointer; white-space: nowrap; gap: 6px; transition: color 0.1s;
+  &:hover { color: ${p => p.theme.textSec}; }
+  &:hover ${TabCloseBtn} { opacity: 1; }
 `;
 
 const RightPanels = styled.div`
@@ -276,7 +304,7 @@ const PanelHeaderEl = styled.div`
 `;
 
 const PanelLabel = styled.span`
-  font-size: 11px; color: ${p => p.theme.textDim}; text-transform: uppercase; letter-spacing: 0.1em;
+  font-size: 12px; color: ${p => p.theme.textDim}; text-transform: uppercase; letter-spacing: 0.08em;
 `;
 
 const PanelDot = styled.div`width: 8px; height: 8px; border-radius: 50%; background: ${p => p.$color};`;
@@ -297,16 +325,16 @@ const AlertCard = styled.div`
 
 const AlertHeader = styled.div`display: flex; align-items: center; gap: 8px; margin-bottom: 10px;`;
 const AlertIcon = styled.div`width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;`;
-const AlertTitle = styled.span`font-size: 12px; font-weight: 600; color: ${p => p.$color === 'red' ? '#fca5a5' : '#fcd34d'}; letter-spacing: 0.03em;`;
-const AlertSubtitle = styled.div`font-size: 12px; color: ${p => p.$color === 'red' ? 'rgba(252,165,165,0.7)' : 'rgba(252,211,77,0.7)'}; margin-top: 2px;`;
+const AlertTitle = styled.span`font-size: 13px; font-weight: 600; color: ${p => p.$color === 'red' ? '#fca5a5' : '#fcd34d'}; letter-spacing: 0.03em;`;
+const AlertSubtitle = styled.div`font-size: 13px; color: ${p => p.$color === 'red' ? 'rgba(252,165,165,0.7)' : 'rgba(252,211,77,0.7)'}; margin-top: 2px;`;
 const SectionBlock = styled.div`margin-bottom: 10px;`;
-const SectionLabel = styled.div`display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: ${p => p.theme.textSec}; margin-bottom: 5px;`;
-const SectionText = styled.div`font-size: 12px; color: ${p => p.$green ? p.theme.green : p.theme.textSec}; line-height: 1.65; font-family: ${p => p.$sans ? 'system-ui, sans-serif' : 'inherit'}; white-space: pre-wrap;`;
-const FixItem = styled.div`display: flex; align-items: flex-start; gap: 6px; font-size: 12px; color: ${p => p.theme.textSec}; line-height: 1.5; margin-bottom: 4px; font-family: system-ui, sans-serif;`;
+const SectionLabel = styled.div`display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: ${p => p.theme.textSec}; margin-bottom: 5px;`;
+const SectionText = styled.div`font-size: 13px; color: ${p => p.$green ? p.theme.green : p.theme.textSec}; line-height: 1.65; font-family: ${p => p.$sans ? 'system-ui, sans-serif' : 'inherit'}; white-space: pre-wrap;`;
+const FixItem = styled.div`display: flex; align-items: flex-start; gap: 6px; font-size: 13px; color: ${p => p.theme.textSec}; line-height: 1.5; margin-bottom: 4px; font-family: system-ui, sans-serif;`;
 const FixDot = styled.div`width: 15px; height: 15px; border-radius: 50%; background: ${p => p.theme.greenBg}; border: 1px solid ${p => p.theme.green}; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px;`;
 const Divider = styled.div`height: 1px; background: ${p => p.theme.border}; margin: 8px 0;`;
 const SuccessCard = styled.div`background: ${p => p.theme.greenBg}; border: 1px solid rgba(16,185,129,0.25); border-left: 3px solid ${p => p.theme.green}; border-radius: 0 6px 6px 0; padding: 14px; animation: ${fadeIn} 0.3s ease;`;
-const EmptyState = styled.div`display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 10px; color: ${p => p.theme.textDim}; font-size: 12px; text-align: center; padding: 20px; line-height: 1.7;`;
+const EmptyState = styled.div`display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 10px; color: ${p => p.theme.textDim}; font-size: 14px; text-align: center; padding: 20px; line-height: 1.7;`;
 
 const WelcomeScreen = styled.div`
   flex: 1; width: 100%; height: 100%; display: flex; flex-direction: column;
@@ -316,14 +344,14 @@ const WelcomeScreen = styled.div`
 const WelcomeBgLogo = styled.img`position: absolute; width: 340px; opacity: ${p => p.theme.mode === 'dark' ? 0.055 : 0.07}; pointer-events: none; user-select: none; filter: ${p => p.theme.mode === 'light' ? 'saturate(0.5)' : 'saturate(0.4)'};`;
 const WelcomeBrand = styled.div`display: flex; flex-direction: column; align-items: center; gap: 8px; position: relative;`;
 const WelcomeBrandName = styled.div`font-size: 24px; font-weight: 700; letter-spacing: 0.18em; color: #22d3ee; text-transform: uppercase;`;
-const WelcomeBrandSub = styled.div`font-size: 12px; color: ${p => p.theme.textDim}; letter-spacing: 0.06em;`;
+const WelcomeBrandSub = styled.div`font-size: 14px; color: ${p => p.theme.textDim}; letter-spacing: 0.06em;`;
 const WelcomeGrid = styled.div`display: flex; flex-direction: column; gap: 8px; min-width: 300px; position: relative;`;
 const WelcomeItem = styled.div`display: flex; align-items: center; justify-content: space-between; padding: 11px 16px; background: ${p => p.theme.bg1}; border: 1px solid ${p => p.theme.border}; border-radius: 7px; cursor: pointer; transition: border-color 0.15s, background 0.15s; &:hover { background: ${p => p.theme.bg2}; border-color: ${p => p.theme.borderHov}; }`;
-const WelcomeItemLabel = styled.span`font-size: 13px; color: ${p => p.theme.textSec}; display: flex; align-items: center; gap: 9px;`;
-const WelcomeKbd = styled.kbd`font-size: 11px; color: ${p => p.theme.textDim}; background: ${p => p.theme.bg3}; border: 1px solid ${p => p.theme.border}; border-radius: 4px; padding: 2px 8px; font-family: 'JetBrains Mono', monospace;`;
+const WelcomeItemLabel = styled.span`font-size: 15px; color: ${p => p.theme.textSec}; display: flex; align-items: center; gap: 9px;`;
+const WelcomeKbd = styled.kbd`font-size: 13px; color: ${p => p.theme.textDim}; background: ${p => p.theme.bg3}; border: 1px solid ${p => p.theme.border}; border-radius: 4px; padding: 2px 8px; font-family: 'JetBrains Mono', monospace;`;
 
 const SaveIndicator = styled.div`
-  position: absolute; top: 12px; right: 18px; font-size: 12px; font-weight: 500;
+  position: absolute; top: 12px; right: 18px; font-size: 13px; font-weight: 500;
   color: ${p => p.$saved ? p.theme.green : p.theme.amber};
   background: ${p => p.$saved ? (p.theme.mode === 'dark' ? 'rgba(16,185,129,0.12)' : 'rgba(5,150,105,0.1)') : (p.theme.mode === 'dark' ? 'rgba(245,158,11,0.12)' : 'rgba(217,119,6,0.1)')};
   border: 1px solid ${p => p.$saved ? p.theme.green : p.theme.amber};
@@ -333,7 +361,7 @@ const SaveIndicator = styled.div`
 
 const TerminalWrapper = styled.div`
   flex: 1; background: ${p => p.theme.bg0}; padding: 10px 16px;
-  overflow-y: auto; font-size: 12px; line-height: 1.75;
+  overflow-y: auto; font-size: 13px; line-height: 1.75;
   &::-webkit-scrollbar { width: 4px; }
   &::-webkit-scrollbar-thumb { background: ${p => p.theme.border}; border-radius: 2px; }
 `;
@@ -346,8 +374,8 @@ const Statusbar = styled.div`
   height: 24px; background: ${p => p.theme.statusBg}; display: flex;
   align-items: center; padding: 0 14px; gap: 16px; flex-shrink: 0;
 `;
-const SbItem = styled.span`font-size: 11px; color: rgba(255,255,255,${p => p.$dim ? '0.65' : '1'});`;
-const SbAlert = styled.span`font-size: 11px; color: #fff; display: flex; align-items: center; gap: 4px;`;
+const SbItem = styled.span`font-size: 12px; color: rgba(255,255,255,${p => p.$dim ? '0.65' : '1'});`;
+const SbAlert = styled.span`font-size: 12px; color: #fff; display: flex; align-items: center; gap: 4px;`;
 
 /* ════════════════════════════════
    ICONS
@@ -394,6 +422,19 @@ const IcoNewFolder = () => (
 ════════════════════════════════ */
 let _nextId = 1;
 const newId = () => String(_nextId++);
+
+// Gera template Java com o nome da classe derivado do arquivo
+const javaTemplate = (fileName) => {
+  const className = fileName.replace(/\.java$/i, '').replace(/[^a-zA-Z0-9_]/g, '_');
+  return `public class ${className} {
+
+    public static void main(String[] args) {
+        // Escreva seu código aqui
+    }
+
+}`;
+};
+
 const newFile = (name = 'Arquivo.java') => ({ id: newId(), name, type: 'file', children: [] });
 const newFolder = (name = 'pacote') => ({ id: newId(), name, type: 'folder', children: [], expanded: true });
 
@@ -431,10 +472,11 @@ const moveNode = (nodes, dragId, targetId) => {
 /* ════════════════════════════════
    SIDEBAR TREE
 ════════════════════════════════ */
-const SidebarTree = ({ tree, setTree, activeFileId, setActiveFileId, onStartCreate, theme }) => {
+const SidebarTree = ({ tree, setTree, activeFileId, setActiveFileId, onStartCreate, onFileCreate, theme }) => {
   const [editingId, setEditingId]   = useState(null);
   const [editValue, setEditValue]   = useState('');
   const [creatingIn, setCreatingIn] = useState(null);
+  const [nameError, setNameError]   = useState('');
   const [ctxMenu, setCtxMenu]       = useState(null);
   const [dragId, setDragId]         = useState(null);
   const [dragOverId, setDragOverId] = useState(null);
@@ -451,22 +493,71 @@ const SidebarTree = ({ tree, setTree, activeFileId, setActiveFileId, onStartCrea
   const startCreate = (parentId, type) => {
     setCreatingIn({ parentId, type });
     setEditValue('');
+    setNameError('');
     if (parentId !== 'root') setTree(t => updateNode(t, parentId, n => ({ ...n, expanded: true })));
+  };
+
+  // Retorna os nomes dos filhos diretos de um nó (ou da raiz)
+  const getSiblingNames = (parentId) => {
+    if (parentId === 'root') return tree.map(n => n.name.toLowerCase());
+    const parent = (() => {
+      const find = (nodes) => { for (const n of nodes) { if (n.id === parentId) return n; if (n.children?.length) { const r = find(n.children); if (r) return r; } } return null; };
+      return find(tree);
+    })();
+    return parent ? parent.children.map(n => n.name.toLowerCase()) : [];
   };
 
   const commitCreate = () => {
     if (!creatingIn) return;
-    const name = editValue.trim() || (creatingIn.type === 'file' ? 'Arquivo.java' : 'pacote');
+    let name = editValue.trim();
+    if (!name) {
+      name = creatingIn.type === 'file' ? 'Arquivo.java' : 'pacote';
+    } else if (creatingIn.type === 'file' && !name.includes('.')) {
+      name = name + '.java';
+    }
+    // Validação: nome duplicado no mesmo nível
+    const siblings = getSiblingNames(creatingIn.parentId);
+    if (siblings.includes(name.toLowerCase())) {
+      setNameError(`"${name}" já existe nesta pasta`);
+      inputRef.current?.focus();
+      return; // bloqueia criação
+    }
+    setNameError('');
     const child = creatingIn.type === 'file' ? newFile(name) : newFolder(name);
     if (creatingIn.parentId === 'root') setTree(t => [...t, child]);
     else setTree(t => insertChild(t, creatingIn.parentId, child));
-    if (creatingIn.type === 'file') setActiveFileId(child.id);
+    if (creatingIn.type === 'file') {
+      setActiveFileId(child.id);
+      if (onFileCreate) onFileCreate(child.id, name);
+    }
     setCreatingIn(null);
   };
 
   const startRename = (node) => { setEditingId(node.id); setEditValue(node.name); setCtxMenu(null); };
   const commitRename = (id) => {
-    if (editValue.trim()) setTree(t => updateNode(t, id, n => ({ ...n, name: editValue.trim() })));
+    const newName = editValue.trim();
+    if (!newName) { setEditingId(null); return; }
+    // Acha o pai do nó sendo renomeado
+    const findParent = (nodes, targetId, parentId = 'root') => {
+      for (const n of nodes) {
+        if (n.id === targetId) return parentId;
+        if (n.children?.length) { const r = findParent(n.children, targetId, n.id); if (r) return r; }
+      }
+      return null;
+    };
+    const parentId = findParent(tree, id);
+    const siblings = getSiblingNames(parentId).filter(name => {
+      // Remove o próprio nó da comparação
+      const self = (() => { const find = (nodes) => { for (const n of nodes) { if (n.id === id) return n; if (n.children?.length) { const r = find(n.children); if (r) return r; } } return null; }; return find(tree); })();
+      return name !== (self?.name || '').toLowerCase();
+    });
+    if (siblings.includes(newName.toLowerCase())) {
+      setNameError(`"${newName}" já existe nesta pasta`);
+      inputRef.current?.focus();
+      return;
+    }
+    setNameError('');
+    setTree(t => updateNode(t, id, n => ({ ...n, name: newName })));
     setEditingId(null);
   };
   const deleteNode = (id) => {
@@ -488,16 +579,32 @@ const SidebarTree = ({ tree, setTree, activeFileId, setActiveFileId, onStartCrea
   };
   const onDragEnd = () => { setDragId(null); setDragOverId(null); };
 
-  const CreatingRow = ({ depth, type }) => (
-    <TreeRow theme={theme} $depth={depth} $active={false}>
-      {type === 'folder' ? <IcoFolder open={false} /> : <IcoFile color="#60a5fa" />}
-      <InlineInput theme={theme} ref={inputRef} value={editValue}
-        placeholder={type === 'file' ? 'Arquivo.java' : 'pacote'}
-        onChange={e => setEditValue(e.target.value)}
-        onBlur={commitCreate}
-        onKeyDown={e => { if (e.key === 'Enter') commitCreate(); if (e.key === 'Escape') setCreatingIn(null); }}
-      />
-    </TreeRow>
+  // CreatingRow como função que retorna JSX (não componente),
+  // para evitar remount do input a cada render (bug de uma letra por vez)
+  const renderCreatingRow = (depth, type) => (
+    <div key="creating-input">
+      <TreeRow theme={theme} $depth={depth} $active={false}>
+        {type === 'folder' ? <IcoFolder open={false} /> : <IcoFile color={nameError ? '#ef4444' : '#60a5fa'} />}
+        <InlineInput theme={theme} ref={inputRef} value={editValue}
+          placeholder={type === 'file' ? 'Arquivo.java' : 'pacote'}
+          style={{ borderColor: nameError ? '#ef4444' : undefined }}
+          onChange={e => { setEditValue(e.target.value); setNameError(''); }}
+          onBlur={commitCreate}
+          onKeyDown={e => { if (e.key === 'Enter') commitCreate(); if (e.key === 'Escape') { setCreatingIn(null); setNameError(''); } }}
+        />
+      </TreeRow>
+      {nameError && (
+        <div style={{
+          fontSize: 11, color: '#ef4444', padding: '2px 10px 4px',
+          display: 'flex', alignItems: 'center', gap: 4,
+        }}>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="#ef4444" strokeWidth="1.5">
+            <circle cx="5" cy="5" r="4"/><path d="M5 3v2.5M5 7v.5" strokeLinecap="round"/>
+          </svg>
+          {nameError}
+        </div>
+      )}
+    </div>
   );
 
   const renderNodes = (nodes, depth = 0) => {
@@ -554,7 +661,7 @@ const SidebarTree = ({ tree, setTree, activeFileId, setActiveFileId, onStartCrea
       );
       if (node.type === 'folder' && node.expanded) {
         items.push(...renderNodes(node.children, depth + 1));
-        if (creatingIn?.parentId === node.id) items.push(<CreatingRow key="creating" depth={depth + 1} type={creatingIn.type} />);
+        if (creatingIn?.parentId === node.id) items.push(renderCreatingRow(depth + 1, creatingIn.type));
       }
     });
     return items;
@@ -566,7 +673,7 @@ const SidebarTree = ({ tree, setTree, activeFileId, setActiveFileId, onStartCrea
         ? <EmptySidebar theme={theme}>Nenhum arquivo ainda.<br/>Use os botões acima para criar.</EmptySidebar>
         : <>
             {renderNodes(tree)}
-            {creatingIn?.parentId === 'root' && <CreatingRow depth={0} type={creatingIn.type} />}
+            {creatingIn?.parentId === 'root' && renderCreatingRow(0, creatingIn.type)}
           </>
       }
       {ctxMenu && (
@@ -674,6 +781,7 @@ const EditorJavaThreads = () => {
   }, []);
 
   const [codigoFonte, setCodigoFonte]           = useState('');
+  const [fileContents, setFileContents]         = useState({}); // map: id -> conteúdo
   const [resultadoAnalise, setResultadoAnalise] = useState(null);
   const [isAnalisando, setIsAnalisando]         = useState(false);
   const [sidebarOpen, setSidebarOpen]           = useState(true);
@@ -697,10 +805,22 @@ const EditorJavaThreads = () => {
   const activeFile = flatFiles(tree).find(f => f.id === activeFileId) || null;
   const nomeArquivoAtivo = activeFile?.name || null;
 
-  useEffect(() => { setEditorKey(activeFileId || 'empty'); }, [activeFileId]);
+  useEffect(() => {
+    setEditorKey(activeFileId || 'empty');
+    // Sincroniza codigoFonte com conteúdo do arquivo ativo
+    setCodigoFonte(fileContents[activeFileId] || '');
+  }, [activeFileId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Quando cria arquivo .java, inicializa com template
+  const handleFileCreate = useCallback((id, name) => {
+    if (name.toLowerCase().endsWith('.java')) {
+      setFileContents(prev => ({ ...prev, [id]: javaTemplate(name) }));
+    }
+  }, []);
 
   const handleCodigoChange = useCallback((novoCodigo) => {
     setCodigoFonte(novoCodigo);
+    if (activeFileId) setFileContents(prev => ({ ...prev, [activeFileId]: novoCodigo }));
     setSaveStatus('unsaved'); setSaveVisible(true);
     clearTimeout(autosaveTimer.current);
     autosaveTimer.current = setTimeout(() => {
@@ -725,12 +845,24 @@ const EditorJavaThreads = () => {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  // Ctrl+N
+  // Ctrl+N — novo arquivo
   useEffect(() => {
     const handler = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
         e.preventDefault();
         startCreateRef.current?.('root', 'file');
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  // Ctrl+P — nova pasta
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+        e.preventDefault();
+        startCreateRef.current?.('root', 'folder');
       }
     };
     window.addEventListener('keydown', handler);
@@ -824,9 +956,7 @@ const EditorJavaThreads = () => {
       <Shell>
 
         <Titlebar>
-          <TitleDots>
-            <Dot color="#ff5f57" /><Dot color="#febc2e" /><Dot color="#28c840" />
-          </TitleDots>
+
           <BrandArea>
             <img src="/logo.png" alt="Sumawma" style={{ width: 24, height: 24, objectFit: 'contain', flexShrink: 0 }} />
             <BrandName>Sumawma</BrandName>
@@ -846,58 +976,66 @@ const EditorJavaThreads = () => {
         </Titlebar>
 
         <Body>
-          {/* Botão flutuante — sempre visível mesmo com sidebar fechada */}
-          <SidebarToggleFloat
-            theme={theme}
-            $open={sidebarOpen}
-            onClick={() => {
-              if (sidebarOpen) sidebarPanelRef.current?.collapse();
-              else sidebarPanelRef.current?.expand();
-            }}
-            title={sidebarOpen ? 'Recolher sidebar' : 'Expandir sidebar'}
-          >
-            <svg width="10" height="10" viewBox="0 0 14 14" fill="none"
-              style={{ transform: sidebarOpen ? 'none' : 'scaleX(-1)', transition: 'transform 0.2s' }}>
-              <path d="M9 3L5 7L9 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </SidebarToggleFloat>
 
-          <PanelGroup direction="horizontal" style={{ flex: 1, overflow: 'hidden' }}>
+          <PanelGroup direction="horizontal" style={{ flexGrow: 1, flexShrink: 1, flexBasis: 0, overflow: 'hidden' }}>
 
             <Panel
               ref={sidebarPanelRef}
-              defaultSize={18} minSize={10} maxSize={35}
-              collapsible collapsedSize={0}
+              defaultSize={20} minSize={15} maxSize={35}
+              collapsible
+              collapsedSize={2}
               onCollapse={() => setSidebarOpen(false)}
               onExpand={() => setSidebarOpen(true)}
+              onResize={size => {
+                // Se arrastou até quase zero, colapsa completamente via botão
+                if (size <= 2 && sidebarOpen) setSidebarOpen(false);
+                if (size > 2 && !sidebarOpen) setSidebarOpen(true);
+              }}
               style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}
             >
               <SidebarInner>
-                <SidebarHeader>
-                  {sidebarOpen && (
-                    <>
-                      <svg width="13" height="13" viewBox="0 0 16 16" fill={theme.textDim} style={{ flexShrink: 0 }}>
-                        <path d="M2 2h4l2 2h6v10H2V2z"/>
-                      </svg>
-                      <SidebarTitle>Explorador</SidebarTitle>
-                      <IconBtn $open title="Novo arquivo (Ctrl+N)" onClick={() => startCreateRef.current?.('root', 'file')}><IcoNewFile /></IconBtn>
-                      <IconBtn $open title="Nova pasta" onClick={() => startCreateRef.current?.('root', 'folder')}><IcoNewFolder /></IconBtn>
-                    </>
-                  )}
-                </SidebarHeader>
+                {sidebarOpen && (
+                  <SidebarHeader>
+                    <svg width="13" height="13" viewBox="0 0 16 16" fill={theme.textDim} style={{ flexShrink: 0 }}>
+                      <path d="M2 2h4l2 2h6v10H2V2z"/>
+                    </svg>
+                    <SidebarTitle>Explorador</SidebarTitle>
+                    <IconBtn $open title="Novo arquivo (Ctrl+N)" onClick={() => startCreateRef.current?.('root', 'file')}><IcoNewFile /></IconBtn>
+                    <IconBtn $open title="Nova pasta (Ctrl+P)" onClick={() => startCreateRef.current?.('root', 'folder')}><IcoNewFolder /></IconBtn>
+                  </SidebarHeader>
+                )}
                 <SidebarContent $open={sidebarOpen}>
                   <SidebarTree
                     tree={tree} setTree={setTree}
                     activeFileId={activeFileId} setActiveFileId={setActiveFileId}
-                    onStartCreate={startCreateRef} theme={theme}
+                    onStartCreate={startCreateRef} onFileCreate={handleFileCreate} theme={theme}
                   />
                 </SidebarContent>
               </SidebarInner>
             </Panel>
 
-            <ResizeHandle theme={theme} />
+            <CollapseHandle theme={theme}>
+              <CollapseHandleBtn
+                theme={theme}
+                onClick={e => {
+                  e.stopPropagation();
+                  if (sidebarOpen) {
+                    sidebarPanelRef.current?.collapse();
+                  } else {
+                    sidebarPanelRef.current?.expand();
+                    setSidebarOpen(true);
+                  }
+                }}
+                title={sidebarOpen ? 'Recolher sidebar' : 'Expandir sidebar'}
+              >
+                <svg width="10" height="10" viewBox="0 0 14 14" fill="none"
+                  style={{ transform: sidebarOpen ? 'none' : 'scaleX(-1)', transition: 'transform 0.2s' }}>
+                  <path d="M9 3L5 7L9 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </CollapseHandleBtn>
+            </CollapseHandle>
 
-            <Panel style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0, flex: 1 }}>
+            <Panel style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
               <EditorArea>
                 {!activeFile ? (
                   <WelcomeScreen>
@@ -914,14 +1052,14 @@ const EditorJavaThreads = () => {
                       </WelcomeItem>
                       <WelcomeItem onClick={() => startCreateRef.current?.('root', 'folder')}>
                         <WelcomeItemLabel><IcoNewFolder /> Nova pasta</WelcomeItemLabel>
-                        <WelcomeKbd>—</WelcomeKbd>
+                        <WelcomeKbd>Ctrl+P</WelcomeKbd>
                       </WelcomeItem>
                       <WelcomeItem style={{ cursor: 'default', background: 'transparent', borderColor: 'transparent' }}>
-                        <WelcomeItemLabel style={{ fontSize: 12 }}>
+                        <WelcomeItemLabel style={{ fontSize: 13 }}>
                           <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
                             <circle cx="6" cy="6" r="5"/><path d="M6 4v3M6 8.5v.5" strokeLinecap="round"/>
                           </svg>
-                          Autosave ativo · Ctrl+S salvar · Ctrl+Enter analisar
+                          Ctrl+N arquivo · Ctrl+P pasta · Ctrl+S salvar · Ctrl+Enter analisar
                         </WelcomeItemLabel>
                       </WelcomeItem>
                     </WelcomeGrid>
@@ -929,7 +1067,28 @@ const EditorJavaThreads = () => {
                 ) : (
                   <>
                     <TabBar>
-                      <Tab $active><TabDot />{nomeArquivoAtivo}</Tab>
+                      <Tab $active>
+                        <TabDot />
+                        <span>{nomeArquivoAtivo}</span>
+                        <TabCloseBtn
+                          theme={theme}
+                          title="Fechar aba (arquivo continua no explorador)"
+                          onClick={e => {
+                            e.stopPropagation();
+                            // Apenas fecha a aba — NÃO remove da tree nem do fileContents
+                            // O arquivo continua na sidebar e pode ser reaberto
+                            setActiveFileId(null);
+                            setResultadoAnalise(null);
+                            setAlertCount(0);
+                            setTerminalLines([]);
+                            setStatusMsg('Pronto');
+                          }}
+                        >
+                          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                            <path d="M2 2l6 6M8 2l-6 6"/>
+                          </svg>
+                        </TabCloseBtn>
+                      </Tab>
                     </TabBar>
                     <div style={{ flex: 1, overflow: 'hidden', minHeight: 0, position: 'relative' }}>
                       <SaveIndicator theme={theme} $saved={saveStatus === 'saved'} $visible={saveVisible}>
@@ -944,6 +1103,8 @@ const EditorJavaThreads = () => {
                           atualizarCaminho={() => {}}
                           onChange={handleCodigoChange}
                           issues={resultadoAnalise?.issues || []}
+                          initialValue={fileContents[activeFileId] || ''}
+                          isDark={isDark}
                         />
                       </div>
                     </div>
@@ -958,7 +1119,7 @@ const EditorJavaThreads = () => {
                       <PanelDot $color={theme.accent} />
                       <PanelLabel>Feedback Educacional</PanelLabel>
                       {alertCount > 0 && (
-                        <span style={{ marginLeft: 'auto', background: 'rgba(239,68,68,0.15)', color: '#fca5a5', fontSize: 11, padding: '2px 9px', borderRadius: 10 }}>
+                        <span style={{ marginLeft: 'auto', background: 'rgba(239,68,68,0.15)', color: '#fca5a5', fontSize: 12, padding: '2px 9px', borderRadius: 10 }}>
                           {alertCount} alerta{alertCount > 1 ? 's' : ''}
                         </span>
                       )}
