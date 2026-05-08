@@ -70,7 +70,9 @@ public class CodeAnalysisService {
                     try {
                         String explicacao = llmFeedbackService.gerarFeedbackDidatico(
                                 issue.getMessage(),
-                                sourceCode.getContent()
+                                sourceCode.getContent(),
+                                issue.getLineNumber(),
+                                null  // histórico: null por ora — será passado quando o banco estiver conectado
                         );
                         issue.setInterpretation(explicacao);
                     } finally {
