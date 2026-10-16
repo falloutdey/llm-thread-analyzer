@@ -291,11 +291,14 @@ const Tab = styled.div`
   &:hover ${TabCloseBtn} { opacity: 1; }
 `;
 
-const RightPanels = styled.div`
-  width: ${p => p.$open ? '360px' : '0px'}; background: ${p => p.theme.bg1};
-  border-left: ${p => p.$open ? `1px solid ${p.theme.border}` : 'none'};
-  display: flex; flex-direction: column; overflow: hidden;
-  transition: width 0.25s ease; flex-shrink: 0; min-height: 0;
+const RightPanelInner = styled.div`
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: ${p => p.theme.bg1};
+  border-left: 1px solid ${p => p.theme.border};
+  overflow: hidden;
+  min-height: 0;
 `;
 
 const PanelHeaderEl = styled.div`
@@ -335,6 +338,61 @@ const FixDot = styled.div`width: 15px; height: 15px; border-radius: 50%; backgro
 const Divider = styled.div`height: 1px; background: ${p => p.theme.border}; margin: 8px 0;`;
 const SuccessCard = styled.div`background: ${p => p.theme.greenBg}; border: 1px solid rgba(16,185,129,0.25); border-left: 3px solid ${p => p.theme.green}; border-radius: 0 6px 6px 0; padding: 14px; animation: ${fadeIn} 0.3s ease;`;
 const EmptyState = styled.div`display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 10px; color: ${p => p.theme.textDim}; font-size: 14px; text-align: center; padding: 20px; line-height: 1.7;`;
+const ModalOverlay = styled.div`
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0,0,0,0.6);
+  display: flex; align-items: center; justify-content: center;
+  animation: ${fadeIn} 0.15s ease;
+  padding: 24px;
+`;
+
+const ModalBox = styled.div`
+  background: ${p => p.theme.bg1};
+  border: 1px solid ${p => p.theme.borderHov};
+  border-radius: 10px;
+  width: 100%; max-width: 620px; max-height: 80vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  overflow: hidden;
+`;
+
+const ModalHeader = styled.div`
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid ${p => p.theme.border};
+  flex-shrink: 0;
+`;
+
+const ModalTitle = styled.span`
+  font-size: 13px; font-weight: 600;
+  color: ${p => p.$color === 'red' ? '#fca5a5' : '#fcd34d'};
+`;
+
+const ModalClose = styled.button`
+  width: 28px; height: 28px; border-radius: 5px;
+  background: none; border: none; cursor: pointer;
+  color: ${p => p.theme.textDim}; display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s, color 0.15s;
+  &:hover { background: ${p => p.theme.bg3}; color: ${p => p.theme.textPri}; }
+`;
+
+const ModalBody = styled.div`
+  padding: 18px; overflow-y: auto; flex: 1;
+  &::-webkit-scrollbar { width: 4px; }
+  &::-webkit-scrollbar-thumb { background: ${p => p.theme.border}; border-radius: 2px; }
+`;
+
+const ExpandBtn = styled.button`
+  margin-top: 8px; padding: 4px 10px;
+  background: none; border: 1px solid ${p => p.theme.border};
+  border-radius: 4px; cursor: pointer; font-size: 11px;
+  color: ${p => p.theme.textDim}; font-family: 'JetBrains Mono', monospace;
+  transition: border-color 0.15s, color 0.15s;
+  display: flex; align-items: center; gap: 4px;
+  &:hover { border-color: ${p => p.theme.accent}; color: ${p => p.theme.accent}; }
+`;
+
+
 
 const WelcomeScreen = styled.div`
   flex: 1; width: 100%; height: 100%; display: flex; flex-direction: column;
@@ -725,11 +783,11 @@ const parseInterpretation = (text) => {
   return sections;
 };
 
-const IssueCard = ({ issue, index }) => {
+const IssueCard = ({ issue, index, onExpand, theme }) => {
   const color = index % 2 === 0 ? 'red' : 'amber';
   const { professor, explanation, fixes } = parseInterpretation(issue.interpretation);
   return (
-    <AlertCard $color={color} $delay={`${index * 0.08}s`}>
+    <AlertCard $color={color} $delay={`${index * 0.08}s`} style={{ cursor: 'default' }}>
       <AlertHeader>
         <AlertIcon>
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -752,6 +810,12 @@ const IssueCard = ({ issue, index }) => {
           </FixItem>
         ))}
       </SectionBlock></>}
+      <ExpandBtn theme={theme} onClick={() => onExpand && onExpand(issue, index)}>
+        <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <path d="M2 8V10h2M10 4V2H8M2 4V2h2M10 8v2H8" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+        Ver completo
+      </ExpandBtn>
     </AlertCard>
   );
 };
@@ -794,6 +858,7 @@ const EditorJavaThreads = () => {
   const [editorKey, setEditorKey]               = useState('initial');
   const [saveStatus, setSaveStatus]             = useState('saved');
   const [saveVisible, setSaveVisible]           = useState(false);
+  const [modalIssue, setModalIssue]             = useState(null); // issue aberto no modal
   const feedbackRef      = useRef(null);
   const termRef          = useRef(null);
   const autosaveTimer    = useRef(null);
@@ -810,6 +875,14 @@ const EditorJavaThreads = () => {
     // Sincroniza codigoFonte com conteúdo do arquivo ativo
     setCodigoFonte(fileContents[activeFileId] || '');
   }, [activeFileId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Quando fileContents muda para o arquivo ativo, sincroniza codigoFonte
+  // Necessário porque handleFileCreate seta o template DEPOIS do useEffect de activeFileId
+  useEffect(() => {
+    if (activeFileId && fileContents[activeFileId]) {
+      setCodigoFonte(fileContents[activeFileId]);
+    }
+  }, [fileContents, activeFileId]);
 
   // Quando cria arquivo .java, inicializa com template
   const handleFileCreate = useCallback((id, name) => {
@@ -889,7 +962,7 @@ const EditorJavaThreads = () => {
 
   const analisarCodigo = async () => {
     if (!codigoFonte.trim()) { alert('Escreva algum código Java antes de analisar.'); return; }
-    setIsAnalisando(true); setResultadoAnalise(null); setPainelOpen(true);
+    setIsAnalisando(true); setResultadoAnalise(null); setPainelOpen(true); setSidebarOpen(false);
     setTerminalLines([]); setStatusMsg('Analisando...'); setAlertCount(0);
     addTermLine(`$ javac ${nomeArquivoAtivo || 'CodigoAluno.java'}`, 'prompt');
     try {
@@ -948,7 +1021,7 @@ const EditorJavaThreads = () => {
         <SectionText theme={theme} $sans $green>O código não apresenta problemas de concorrência ou deadlocks.</SectionText>
       </SuccessCard>
     );
-    return resultadoAnalise.issues.map((issue, i) => <IssueCard key={i} issue={issue} index={i} />);
+    return resultadoAnalise.issues.map((issue, i) => <IssueCard key={i} issue={issue} index={i} theme={theme} onExpand={(iss, idx) => setModalIssue({ issue: iss, index: idx })} />);
   };
 
   return (
@@ -1112,36 +1185,45 @@ const EditorJavaThreads = () => {
                 )}
               </EditorArea>
 
-              <RightPanels $open={painelOpen}>
-                <PanelGroup direction="vertical" style={{ height: '100%' }}>
-                  <Panel defaultSize={62} minSize={30} style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-                    <PanelHeaderEl>
-                      <PanelDot $color={theme.accent} />
-                      <PanelLabel>Feedback Educacional</PanelLabel>
-                      {alertCount > 0 && (
-                        <span style={{ marginLeft: 'auto', background: 'rgba(239,68,68,0.15)', color: '#fca5a5', fontSize: 12, padding: '2px 9px', borderRadius: 10 }}>
-                          {alertCount} alerta{alertCount > 1 ? 's' : ''}
-                        </span>
-                      )}
-                    </PanelHeaderEl>
-                    <FeedbackBody ref={feedbackRef}>{renderFeedback()}</FeedbackBody>
-                  </Panel>
-                  <PanelResizeHandle style={{ height: 5, background: theme.border, cursor: 'row-resize', flexShrink: 0 }} />
-                  <Panel defaultSize={38} minSize={20} style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-                    <PanelHeaderEl>
-                      <PanelDot $color={theme.green} />
-                      <PanelLabel>Terminal</PanelLabel>
-                    </PanelHeaderEl>
-                    <TerminalWrapper ref={termRef}>
-                      {terminalLines.length === 0
-                        ? <TermLine $type="default">$ A aguardar execução do código Java...</TermLine>
-                        : terminalLines.map((l, i) => <TermLine key={i} $type={l.type}>{l.text}</TermLine>)
-                      }
-                    </TerminalWrapper>
-                  </Panel>
-                </PanelGroup>
-              </RightPanels>
             </Panel>
+
+            {/* Painel direito — filho direto do PanelGroup para ter espaço real */}
+            {painelOpen && (
+              <>
+                <PanelResizeHandle style={{ width: 5, background: theme.border, cursor: 'col-resize' }} />
+                <Panel defaultSize={30} minSize={20} maxSize={50} style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                  <RightPanelInner>
+                    <PanelGroup direction="vertical" style={{ height: '100%' }}>
+                      <Panel defaultSize={62} minSize={30} style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                        <PanelHeaderEl>
+                          <PanelDot $color={theme.accent} />
+                          <PanelLabel>Feedback Educacional</PanelLabel>
+                          {alertCount > 0 && (
+                            <span style={{ marginLeft: 'auto', background: 'rgba(239,68,68,0.15)', color: '#fca5a5', fontSize: 12, padding: '2px 9px', borderRadius: 10 }}>
+                              {alertCount} alerta{alertCount > 1 ? 's' : ''}
+                            </span>
+                          )}
+                        </PanelHeaderEl>
+                        <FeedbackBody ref={feedbackRef}>{renderFeedback()}</FeedbackBody>
+                      </Panel>
+                      <PanelResizeHandle style={{ height: 5, background: theme.border, cursor: 'row-resize', flexShrink: 0 }} />
+                      <Panel defaultSize={38} minSize={20} style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                        <PanelHeaderEl>
+                          <PanelDot $color={theme.green} />
+                          <PanelLabel>Terminal</PanelLabel>
+                        </PanelHeaderEl>
+                        <TerminalWrapper ref={termRef}>
+                          {terminalLines.length === 0
+                            ? <TermLine $type="default">$ A aguardar execução do código Java...</TermLine>
+                            : terminalLines.map((l, i) => <TermLine key={i} $type={l.type}>{l.text}</TermLine>)
+                          }
+                        </TerminalWrapper>
+                      </Panel>
+                    </PanelGroup>
+                  </RightPanelInner>
+                </Panel>
+              </>
+            )}
 
           </PanelGroup>
         </Body>
@@ -1162,6 +1244,80 @@ const EditorJavaThreads = () => {
         </Statusbar>
 
       </Shell>
+
+      {/* Modal de leitura completa do feedback */}
+      {modalIssue && (() => {
+        const { issue, index } = modalIssue;
+        const color = index % 2 === 0 ? 'red' : 'amber';
+        const { professor, explanation, fixes } = parseInterpretation(issue.interpretation);
+        return (
+          <ModalOverlay onClick={() => setModalIssue(null)}>
+            <ModalBox theme={theme} onClick={e => e.stopPropagation()}>
+              <ModalHeader theme={theme}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M8 2L1 14h14L8 2z" stroke={color === 'red' ? '#fca5a5' : '#fcd34d'} strokeWidth="1.5" strokeLinejoin="round"/>
+                    <path d="M8 7v3M8 12v.5" stroke={color === 'red' ? '#fca5a5' : '#fcd34d'} strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
+                  <div>
+                    <ModalTitle $color={color}>Alerta Técnico — Linha {issue.lineNumber}</ModalTitle>
+                    <div style={{ fontSize: 12, color: color === 'red' ? 'rgba(252,165,165,0.7)' : 'rgba(252,211,77,0.7)', marginTop: 2 }}>
+                      {issue.message}
+                    </div>
+                  </div>
+                </div>
+                <ModalClose theme={theme} onClick={() => setModalIssue(null)} title="Fechar">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                    <path d="M2 2l8 8M10 2l-8 8"/>
+                  </svg>
+                </ModalClose>
+              </ModalHeader>
+              <ModalBody theme={theme}>
+                {professor && (
+                  <SectionBlock>
+                    <SectionLabel theme={theme}><span style={{ fontSize: 15 }}>🤖</span><span>Professor LLM:</span></SectionLabel>
+                    <SectionText theme={theme} $sans style={{ fontSize: 14, lineHeight: 1.8 }}>{professor}</SectionText>
+                  </SectionBlock>
+                )}
+                {explanation && (
+                  <>
+                    <Divider theme={theme} />
+                    <SectionBlock>
+                      <SectionLabel theme={theme}><span style={{ fontSize: 15 }}>📦</span><span>Explicação</span></SectionLabel>
+                      <SectionText theme={theme} $sans style={{ fontSize: 14, lineHeight: 1.8 }}>{explanation}</SectionText>
+                    </SectionBlock>
+                  </>
+                )}
+                {fixes.length > 0 && (
+                  <>
+                    <Divider theme={theme} />
+                    <SectionBlock>
+                      <SectionLabel theme={theme}><span style={{ fontSize: 15 }}>💡</span><span>Como Corrigir</span></SectionLabel>
+                      {fixes.map((fix, i) => (
+                        <FixItem key={i} theme={theme}>
+                          <FixDot theme={theme}>
+                            <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                              <path d="M1.5 4l2 2 3-3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </FixDot>
+                          <span style={{ fontSize: 14, lineHeight: 1.8 }}>{fix}</span>
+                        </FixItem>
+                      ))}
+                    </SectionBlock>
+                  </>
+                )}
+                {/* Caso o LLM tenha retornado texto não estruturado */}
+                {!professor && !explanation && fixes.length === 0 && issue.interpretation && (
+                  <SectionText theme={theme} $sans style={{ fontSize: 14, lineHeight: 1.8 }}>
+                    {issue.interpretation}
+                  </SectionText>
+                )}
+              </ModalBody>
+            </ModalBox>
+          </ModalOverlay>
+        );
+      })()}
+
     </ThemeProvider>
   );
 };

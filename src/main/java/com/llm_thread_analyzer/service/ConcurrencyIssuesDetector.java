@@ -82,9 +82,27 @@ public class ConcurrencyIssuesDetector {
                 String type = bug.getType();
                 System.out.println("Bug Detetado -> Categoria: " + category + " | Tipo: " + type);
 
-                // Filtra apenas bugs de concorrência: categoria MT_CORRECTNESS
-                // ou tipos cujo nome mencione THREAD ou SYNCH
-                if (category.equals("MT_CORRECTNESS") || type.contains("THREAD") || type.contains("SYNCH")) {
+                // Filtra bugs de concorrência — categorias e padrões relevantes:
+                // MT_CORRECTNESS = categoria principal de thread safety no SpotBugs
+                // THREAD, SYNCH, VOLATILE, LOCK = keywords em tipos de bugs de concorrência
+                // IS_FIELD_NOT_GUARDED, VO_VOLATILE = detectores específicos de race conditions
+                boolean isConcurrencyBug =
+                    category.equals("MT_CORRECTNESS") ||
+                    type.contains("THREAD") ||
+                    type.contains("SYNCH") ||
+                    type.contains("VOLATILE") ||
+                    type.contains("LOCK") ||
+                    type.contains("RACE") ||
+                    type.startsWith("IS_") ||
+                    type.startsWith("VO_") ||
+                    type.startsWith("DL_") ||   // deadlock
+                    type.startsWith("LI_") ||   // lock issues
+                    type.startsWith("JML_") ||  // inconsistent sync
+                    type.startsWith("IS2_") ||  // inconsistent sync v2
+                    type.startsWith("MSF_") ||  // mutable servlet field
+                    type.startsWith("STCAL_");  // static calendar/date (thread-unsafe)
+
+                if (isConcurrencyBug) {
 
                     // lineNumber 0 indica bug de nível estrutural (classe/método)
                     // sem linha específica identificável no código fonte

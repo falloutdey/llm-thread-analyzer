@@ -105,8 +105,40 @@ public class LLMFeedbackService {
 
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
 
+        // Retry automático para erros 503 (servidor sobrecarregado) — até 3 tentativas
+        int maxRetries = 3;
+        int retryDelayMs = 3000;
+
+        ResponseEntity<Map> response = null;
+        Exception lastException = null;
+
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                response = restTemplate.postForEntity(apiUrl, entity, Map.class);
+                break; // sucesso — sai do loop
+            } catch (HttpClientErrorException e) {
+                // 429 = cota esgotada — não faz retry, falha imediatamente
+                if (e.getStatusCode().value() == 429) {
+                    throw new LlmApiException("Cota da API Gemini esgotada (429). Tente novamente amanhã ou verifique seu plano em ai.google.dev.", e);
+                }
+                throw new LlmApiException("Erro HTTP " + e.getStatusCode() + ": " + e.getResponseBodyAsString(), e);
+            } catch (HttpServerErrorException e) {
+                // 503 = sobrecarga temporária — faz retry com backoff
+                if (e.getStatusCode().value() == 503 && attempt < maxRetries) {
+                    System.out.println("[LLM] 503 recebido, tentativa " + attempt + "/" + maxRetries + ". Aguardando " + retryDelayMs + "ms...");
+                    try { Thread.sleep(retryDelayMs); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
+                    retryDelayMs *= 2;
+                } else {
+                    throw new LlmApiException("Erro servidor Gemini (" + e.getStatusCode() + "): " + e.getResponseBodyAsString(), e);
+                }
+            }
+        }
+
+        if (response == null) {
+            throw new LlmApiException("Gemini indisponível após " + maxRetries + " tentativas (503).");
+        }
+
         try {
-            ResponseEntity<Map> response = restTemplate.postForEntity(apiUrl, entity, Map.class);
             Map<String, Object> responseBody = response.getBody();
 
             if (responseBody != null && responseBody.containsKey("candidates")) {
@@ -147,10 +179,6 @@ public class LLMFeedbackService {
                 throw new LlmApiException("Resposta fora do formato esperado: " + raw);
             }
 
-        } catch (HttpClientErrorException e) {
-            throw new LlmApiException("Erro HTTP " + e.getStatusCode() + ": " + e.getResponseBodyAsString(), e);
-        } catch (HttpServerErrorException e) {
-            throw new LlmApiException("Erro servidor Gemini (" + e.getStatusCode() + "): " + e.getResponseBodyAsString(), e);
         } catch (LlmApiException e) {
             throw e;
         } catch (Exception e) {
