@@ -23,13 +23,15 @@ import java.util.concurrent.Semaphore;
 @Service
 public class CodeAnalysisService {
 
-    // Intervalo entre chamadas ao Gemini para respeitar o rate limit do tier gratuito (~15 RPM)
-    // 4500ms = ~13 requisições/minuto, com margem de segurança
+    // Intervalo mínimo global entre o início de chamadas ao Gemini, inclusive
+    // quando os alertas vêm de requisições HTTP diferentes.
     private static final long GEMINI_RATE_LIMIT_DELAY_MS = 4500;
 
     // O Semaphore(1) garante que apenas UMA thread faz a chamada ao LLM de cada vez,
     // independentemente de quantas requisições simultâneas o Spring Boot esteja a processar.
     private static final Semaphore GEMINI_SEMAPHORE = new Semaphore(1);
+    private static long lastGeminiCallStartedAtNanos;
+    private static boolean hasGeminiCallStarted;
 
     @Autowired
     private ConcurrencyIssuesDetector spotBugsDetector;
@@ -61,39 +63,36 @@ public class CodeAnalysisService {
 
             List<ConcurrencyIssue> issues = spotBugsDetector.detectConcurrencyIssues(caminhoFicheiroClass);
 
-            for (int i = 0; i < issues.size(); i++) {
-                ConcurrencyIssue issue = issues.get(i);
+            for (int issueIndex = 0; issueIndex < issues.size(); issueIndex++) {
+                ConcurrencyIssue issue = issues.get(issueIndex);
+                boolean semaphoreAcquired = false;
                 try {
-                    // Adquirir o Semaphore antes de chamar o Gemini
-                    // Garante exclusividade global mesmo com múltiplas threads simultâneas
                     GEMINI_SEMAPHORE.acquire();
-                    try {
-                        String explicacao = llmFeedbackService.gerarFeedbackDidatico(
-                                issue.getMessage(),
-                                sourceCode.getContent(),
-                                issue.getLineNumber(),
-                                null  // histórico: null por ora — será passado quando o banco estiver conectado
-                        );
-                        issue.setInterpretation(explicacao);
-                    } finally {
-                        // Sleep dentro do bloco finally: o delay é aplicado ANTES
-                        // de libertar o semáforo, garantindo que a próxima thread só avança
-                        // após o intervalo de rate limit, não apenas após a chamada terminar
-                        if (i < issues.size() - 1) {
-                            System.out.println("[CodeAnalysis] Aguardando " + GEMINI_RATE_LIMIT_DELAY_MS + "ms (rate limit)...");
-                            Thread.sleep(GEMINI_RATE_LIMIT_DELAY_MS);
-                        }
-                        GEMINI_SEMAPHORE.release();
-                    }
+                    semaphoreAcquired = true;
+                    aguardarIntervaloMinimoEntreChamadasGemini();
+
+                    String explicacao = llmFeedbackService.gerarFeedbackDidatico(
+                            issue.getMessage(),
+                            sourceCode.getContent(),
+                            issue.getLineNumber(),
+                            null  // histórico: null por ora — será passado quando o banco estiver conectado
+                    );
+                    issue.setInterpretation(explicacao);
                 } catch (LlmApiException e) {
                     // Falha do LLM marcada estruturalmente e não interrompe os outros issues.
-                    System.err.println("[CodeAnalysis] Falha do LLM para issue #" + i + ": " + e.getMessage());
+                    System.err.println("[CodeAnalysis] Falha do LLM para issue #" + issueIndex + ": " + e.getMessage());
                     issue.setLlmError(true);
                     issue.setLlmErrorMessage(e.getMessage());
                 } catch (InterruptedException ie) {
                     // Repõe o estado de interrupção da thread.
                     Thread.currentThread().interrupt();
                     break;
+                } finally {
+                    // A liberação fica garantida mesmo se o intervalo ou a chamada ao LLM
+                    // for interrompida, evitando bloquear permanentemente as análises seguintes.
+                    if (semaphoreAcquired) {
+                        GEMINI_SEMAPHORE.release();
+                    }
                 }
             }
 
@@ -111,6 +110,27 @@ public class CodeAnalysisService {
                 deletarDiretorioTemporario(tempDir);
             }
         }
+    }
+
+    /**
+     * Garante o intervalo mínimo entre chamadas globais ao Gemini.
+     * O semáforo deve estar adquirido durante esta chamada.
+     */
+    private static void aguardarIntervaloMinimoEntreChamadasGemini() throws InterruptedException {
+        long intervaloNanos = GEMINI_RATE_LIMIT_DELAY_MS * 1_000_000L;
+        long agora = System.nanoTime();
+
+        if (hasGeminiCallStarted) {
+            long restanteNanos = intervaloNanos - (agora - lastGeminiCallStartedAtNanos);
+            if (restanteNanos > 0L) {
+                long millis = restanteNanos / 1_000_000L;
+                int nanos = (int) (restanteNanos % 1_000_000L);
+                Thread.sleep(millis, nanos);
+            }
+        }
+
+        lastGeminiCallStartedAtNanos = System.nanoTime();
+        hasGeminiCallStarted = true;
     }
 
     /**

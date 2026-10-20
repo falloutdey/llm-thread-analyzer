@@ -104,6 +104,14 @@ const ThemeBtn = styled.button`
   &:hover { background: ${p => p.theme.bg2}; color: ${p => p.theme.textPri}; }
 `;
 
+const SaveWorkspaceBtn = styled.button`
+  padding: 6px 12px; background: ${p => p.theme.bg3}; color: ${p => p.theme.textSec};
+  border: 1px solid ${p => p.theme.border}; border-radius: 5px; font-size: 12px;
+  font-family: inherit; cursor: ${p => p.disabled ? 'not-allowed' : 'pointer'};
+  opacity: ${p => p.disabled ? 0.5 : 1};
+  &:hover:not(:disabled) { border-color: ${p => p.theme.accent}; color: ${p => p.theme.accent}; }
+`;
+
 const SpinnerEl = styled.div`
   width: 10px; height: 10px;
   border: 1.5px solid rgba(255,255,255,0.3); border-top-color: #fff;
@@ -410,9 +418,12 @@ const WelcomeKbd = styled.kbd`font-size: 13px; color: ${p => p.theme.textDim}; b
 
 const SaveIndicator = styled.div`
   position: absolute; top: 12px; right: 18px; font-size: 13px; font-weight: 500;
-  color: ${p => p.$saved ? p.theme.green : p.theme.amber};
-  background: ${p => p.$saved ? (p.theme.mode === 'dark' ? 'rgba(16,185,129,0.12)' : 'rgba(5,150,105,0.1)') : (p.theme.mode === 'dark' ? 'rgba(245,158,11,0.12)' : 'rgba(217,119,6,0.1)')};
-  border: 1px solid ${p => p.$saved ? p.theme.green : p.theme.amber};
+  color: ${p => p.$saved ? p.theme.green : p.$error ? p.theme.red : p.theme.amber};
+  background: ${p => p.$saved
+    ? (p.theme.mode === 'dark' ? 'rgba(16,185,129,0.12)' : 'rgba(5,150,105,0.1)')
+    : p.$error ? (p.theme.mode === 'dark' ? 'rgba(239,68,68,0.12)' : 'rgba(220,38,38,0.1)')
+      : (p.theme.mode === 'dark' ? 'rgba(245,158,11,0.12)' : 'rgba(217,119,6,0.1)')};
+  border: 1px solid ${p => p.$saved ? p.theme.green : p.$error ? p.theme.red : p.theme.amber};
   border-radius: 5px; padding: 4px 10px; display: flex; align-items: center; gap: 5px;
   opacity: ${p => p.$visible ? 1 : 0}; transition: opacity 0.4s; pointer-events: none; z-index: 5;
 `;
@@ -479,7 +490,10 @@ const IcoNewFolder = () => (
    TREE HELPERS
 ════════════════════════════════ */
 let _nextId = 1;
-const newId = () => String(_nextId++);
+const newId = () => {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  return `java-file-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+};
 
 // Gera template Java com o nome da classe derivado do arquivo
 const javaTemplate = (fileName) => {
@@ -519,6 +533,39 @@ const flatFiles = (nodes, acc = []) => {
   return acc;
 };
 
+const fileIdsInNode = (node) => {
+  if (!node) return [];
+  return [
+    ...(node.type === 'file' ? [node.id] : []),
+    ...(node.children || []).flatMap(fileIdsInNode),
+  ];
+};
+
+const JAVA_WORKSPACE_STORAGE_VERSION = 1;
+
+const readSavedJavaWorkspace = (storageKey) => {
+  try {
+    const raw = localStorage.getItem(storageKey);
+    if (!raw) return null;
+
+    const saved = JSON.parse(raw);
+    if (saved?.version !== JAVA_WORKSPACE_STORAGE_VERSION || !Array.isArray(saved.tree)) {
+      return null;
+    }
+
+    return {
+      tree: saved.tree,
+      fileContents: saved.fileContents && typeof saved.fileContents === 'object' && !Array.isArray(saved.fileContents)
+        ? saved.fileContents
+        : {},
+      activeFileId: saved.activeFileId || null,
+    };
+  } catch (error) {
+    console.warn('[JavaThreads] Não foi possível restaurar o espaço de trabalho salvo.', error);
+    return null;
+  }
+};
+
 const moveNode = (nodes, dragId, targetId) => {
   let dragNode = null;
   const find = (ns) => { for (const n of ns) { if (n.id === dragId) { dragNode = n; return; } if (n.children?.length) find(n.children); } };
@@ -530,7 +577,7 @@ const moveNode = (nodes, dragId, targetId) => {
 /* ════════════════════════════════
    SIDEBAR TREE
 ════════════════════════════════ */
-const SidebarTree = ({ tree, setTree, activeFileId, setActiveFileId, onStartCreate, onFileCreate, theme }) => {
+const SidebarTree = ({ tree, setTree, activeFileId, setActiveFileId, onStartCreate, onFileCreate, onNodeDelete, theme }) => {
   const [editingId, setEditingId]   = useState(null);
   const [editValue, setEditValue]   = useState('');
   const [creatingIn, setCreatingIn] = useState(null);
@@ -619,8 +666,20 @@ const SidebarTree = ({ tree, setTree, activeFileId, setActiveFileId, onStartCrea
     setEditingId(null);
   };
   const deleteNode = (id) => {
+    const findNode = (nodes) => {
+      for (const node of nodes) {
+        if (node.id === id) return node;
+        if (node.children?.length) {
+          const found = findNode(node.children);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+    const deletedFileIds = fileIdsInNode(findNode(tree));
+    if (onNodeDelete) onNodeDelete(deletedFileIds);
     setTree(t => removeNode(t, id));
-    if (activeFileId === id) setActiveFileId(null);
+    if (deletedFileIds.includes(activeFileId)) setActiveFileId(null);
     setCtxMenu(null);
   };
   const toggleExpand = (id) => setTree(t => updateNode(t, id, n => ({ ...n, expanded: !n.expanded })));
@@ -824,13 +883,20 @@ const IssueCard = ({ issue, index, onExpand, theme }) => {
    MAIN COMPONENT
 ════════════════════════════════ */
 const EditorJavaThreads = () => {
-  const { idArquivo } = useParams();
+  const { idProjeto } = useParams();
 
   const [isDark, setIsDark] = useState(() => {
     const saved = localStorage.getItem('sumawma-theme');
     return saved ? saved === 'dark' : true;
   });
   const theme = isDark ? darkTheme : lightTheme;
+
+  const [workspaceStorageKey] = useState(() => {
+    const studentId = localStorage.getItem('id_estudante') || 'local';
+    const projectId = idProjeto || 'principal';
+    return `sumawma-java-threads:v${JAVA_WORKSPACE_STORAGE_VERSION}:${studentId}:${projectId}`;
+  });
+  const [workspaceSeed] = useState(() => readSavedJavaWorkspace(workspaceStorageKey));
 
   const toggleTheme = () => {
     const next = !isDark;
@@ -845,7 +911,7 @@ const EditorJavaThreads = () => {
   }, []);
 
   const [codigoFonte, setCodigoFonte]           = useState('');
-  const [fileContents, setFileContents]         = useState({}); // map: id -> conteúdo
+  const [fileContents, setFileContents]         = useState(() => workspaceSeed?.fileContents || {});
   const [resultadoAnalise, setResultadoAnalise] = useState(null);
   const [isAnalisando, setIsAnalisando]         = useState(false);
   const [sidebarOpen, setSidebarOpen]           = useState(true);
@@ -853,19 +919,44 @@ const EditorJavaThreads = () => {
   const [terminalLines, setTerminalLines]       = useState([]);
   const [statusMsg, setStatusMsg]               = useState('Pronto');
   const [alertCount, setAlertCount]             = useState(0);
-  const [tree, setTree]                         = useState([]);
-  const [activeFileId, setActiveFileId]         = useState(null);
+  const [tree, setTree]                         = useState(() => workspaceSeed?.tree || []);
+  const [activeFileId, setActiveFileId]         = useState(() => workspaceSeed?.activeFileId || null);
   const [editorKey, setEditorKey]               = useState('initial');
   const [saveStatus, setSaveStatus]             = useState('saved');
   const [saveVisible, setSaveVisible]           = useState(false);
   const [modalIssue, setModalIssue]             = useState(null); // issue aberto no modal
   const feedbackRef      = useRef(null);
   const termRef          = useRef(null);
-  const autosaveTimer    = useRef(null);
   const saveVisibleTimer = useRef(null);
   const startCreateRef   = useRef(null);
   const analisarRef      = useRef(null);
   const sidebarPanelRef  = useRef(null);
+
+  const saveWorkspace = useCallback(() => {
+    try {
+      localStorage.setItem(workspaceStorageKey, JSON.stringify({
+        version: JAVA_WORKSPACE_STORAGE_VERSION,
+        tree,
+        fileContents,
+        activeFileId,
+      }));
+      setSaveStatus('saved');
+      setSaveVisible(true);
+      clearTimeout(saveVisibleTimer.current);
+      saveVisibleTimer.current = setTimeout(() => setSaveVisible(false), 1500);
+      return true;
+    } catch (error) {
+      console.error('[JavaThreads] Não foi possível salvar o espaço de trabalho.', error);
+      setSaveStatus('error');
+      setSaveVisible(true);
+      return false;
+    }
+  }, [workspaceStorageKey, tree, fileContents, activeFileId]);
+
+  useEffect(() => {
+    const timer = setTimeout(saveWorkspace, 700);
+    return () => clearTimeout(timer);
+  }, [saveWorkspace]);
 
   const activeFile = flatFiles(tree).find(f => f.id === activeFileId) || null;
   const nomeArquivoAtivo = activeFile?.name || null;
@@ -879,7 +970,7 @@ const EditorJavaThreads = () => {
   // Quando fileContents muda para o arquivo ativo, sincroniza codigoFonte
   // Necessário porque handleFileCreate seta o template DEPOIS do useEffect de activeFileId
   useEffect(() => {
-    if (activeFileId && fileContents[activeFileId]) {
+    if (activeFileId && Object.prototype.hasOwnProperty.call(fileContents, activeFileId)) {
       setCodigoFonte(fileContents[activeFileId]);
     }
   }, [fileContents, activeFileId]);
@@ -891,32 +982,34 @@ const EditorJavaThreads = () => {
     }
   }, []);
 
+  const handleNodeDelete = useCallback((fileIds) => {
+    if (!fileIds.length) return;
+    setFileContents(prev => {
+      const next = { ...prev };
+      fileIds.forEach(id => delete next[id]);
+      return next;
+    });
+    if (fileIds.includes(activeFileId)) setActiveFileId(null);
+  }, [activeFileId]);
+
   const handleCodigoChange = useCallback((novoCodigo) => {
     setCodigoFonte(novoCodigo);
     if (activeFileId) setFileContents(prev => ({ ...prev, [activeFileId]: novoCodigo }));
-    setSaveStatus('unsaved'); setSaveVisible(true);
-    clearTimeout(autosaveTimer.current);
-    autosaveTimer.current = setTimeout(() => {
-      setSaveStatus('saved');
-      clearTimeout(saveVisibleTimer.current);
-      saveVisibleTimer.current = setTimeout(() => setSaveVisible(false), 1500);
-    }, 1000);
-  }, []);
+    setSaveStatus('unsaved');
+    setSaveVisible(true);
+  }, [activeFileId]);
 
   // Ctrl+S
   useEffect(() => {
     const handler = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
-        clearTimeout(autosaveTimer.current);
-        setSaveStatus('saved'); setSaveVisible(true);
-        clearTimeout(saveVisibleTimer.current);
-        saveVisibleTimer.current = setTimeout(() => setSaveVisible(false), 1500);
+        saveWorkspace();
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, []);
+  }, [saveWorkspace]);
 
   // Ctrl+N — novo arquivo
   useEffect(() => {
@@ -1040,6 +1133,9 @@ const EditorJavaThreads = () => {
           <ThemeBtn onClick={toggleTheme}>
             {isDark ? '☀️ Modo claro' : '🌙 Modo escuro'}
           </ThemeBtn>
+          <SaveWorkspaceBtn theme={theme} onClick={saveWorkspace} disabled={!activeFile}>
+            Salvar
+          </SaveWorkspaceBtn>
           <RunButton $running={isAnalisando} onClick={analisarCodigo} disabled={isAnalisando}>
             {isAnalisando
               ? <><SpinnerEl /> Processando...</>
@@ -1081,7 +1177,8 @@ const EditorJavaThreads = () => {
                   <SidebarTree
                     tree={tree} setTree={setTree}
                     activeFileId={activeFileId} setActiveFileId={setActiveFileId}
-                    onStartCreate={startCreateRef} onFileCreate={handleFileCreate} theme={theme}
+                    onStartCreate={startCreateRef} onFileCreate={handleFileCreate}
+                    onNodeDelete={handleNodeDelete} theme={theme}
                   />
                 </SidebarContent>
               </SidebarInner>
@@ -1164,15 +1261,21 @@ const EditorJavaThreads = () => {
                       </Tab>
                     </TabBar>
                     <div style={{ flex: 1, overflow: 'hidden', minHeight: 0, position: 'relative' }}>
-                      <SaveIndicator theme={theme} $saved={saveStatus === 'saved'} $visible={saveVisible}>
+                      <SaveIndicator
+                        theme={theme}
+                        $saved={saveStatus === 'saved'}
+                        $error={saveStatus === 'error'}
+                        $visible={saveVisible}
+                      >
                         {saveStatus === 'saved'
                           ? <><svg width="11" height="11" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M1.5 5l2.5 2.5 4.5-4" strokeLinecap="round" strokeLinejoin="round"/></svg>Salvo</>
-                          : <><svg width="11" height="11" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="5" cy="5" r="4"/><path d="M5 3v2.5" strokeLinecap="round"/></svg>Salvando...</>
+                          : saveStatus === 'error'
+                            ? <><svg width="11" height="11" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="5" cy="5" r="4"/><path d="M5 3v2.5M5 7v.5" strokeLinecap="round"/></svg>Falha ao salvar</>
+                            : <><svg width="11" height="11" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="5" cy="5" r="4"/><path d="M5 3v2.5" strokeLinecap="round"/></svg>Salvando...</>
                         }
                       </SaveIndicator>
                       <div key={editorKey} style={{ height: '100%' }}>
                         <MeuEditor
-                          idArquivo={idArquivo}
                           atualizarCaminho={() => {}}
                           onChange={handleCodigoChange}
                           issues={resultadoAnalise?.issues || []}
