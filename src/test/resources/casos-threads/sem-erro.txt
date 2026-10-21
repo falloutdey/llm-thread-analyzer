@@ -1,0 +1,202 @@
+### n01_contador_atomico ContadorAtomico -
+import java.util.concurrent.atomic.AtomicInteger;
+public class ContadorAtomico {
+    static final AtomicInteger contador = new AtomicInteger();
+    public static void main(String[] args) throws InterruptedException {
+        Runnable r = () -> { for (int i = 0; i < 1000; i++) contador.incrementAndGet(); };
+        Thread a = new Thread(r), b = new Thread(r);
+        a.start(); b.start(); a.join(); b.join();
+        System.out.println(contador.get());
+    }
+}
+### n02_metodo_synchronized ContadorSincronizado -
+public class ContadorSincronizado {
+    private int valor;
+    public synchronized void inc() { valor++; }
+    public synchronized int get() { return valor; }
+    public static void main(String[] args) throws InterruptedException {
+        ContadorSincronizado c = new ContadorSincronizado();
+        Runnable r = () -> { for (int i = 0; i < 1000; i++) c.inc(); };
+        Thread a = new Thread(r), b = new Thread(r);
+        a.start(); b.start(); a.join(); b.join();
+        System.out.println(c.get());
+    }
+}
+### n03_resultado_com_join ResultadoComJoin -
+public class ResultadoComJoin {
+    static int resultado;
+    public static void main(String[] args) throws InterruptedException {
+        Thread t = new Thread(() -> resultado = 42);
+        t.start();
+        t.join();
+        System.out.println(resultado);
+    }
+}
+### n04_locks_mesma_ordem MesmaOrdem -
+public class MesmaOrdem {
+    static final Object A = new Object(), B = new Object();
+    public static void main(String[] args) {
+        new Thread(() -> { synchronized (A) { synchronized (B) { System.out.println("t1"); } } }).start();
+        new Thread(() -> { synchronized (A) { synchronized (B) { System.out.println("t2"); } } }).start();
+    }
+}
+### n05_produtor_consumidor Caixa -
+public class Caixa {
+    private Integer item;
+    public synchronized void colocar(int x) throws InterruptedException {
+        while (item != null) wait();
+        item = x;
+        notifyAll();
+    }
+    public synchronized int retirar() throws InterruptedException {
+        while (item == null) wait();
+        int x = item;
+        item = null;
+        notifyAll();
+        return x;
+    }
+    public static void main(String[] args) {
+        Caixa c = new Caixa();
+        new Thread(() -> {
+            try { for (int i = 0; i < 3; i++) c.colocar(i); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        }).start();
+        new Thread(() -> {
+            try { for (int i = 0; i < 3; i++) System.out.println(c.retirar()); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        }).start();
+    }
+}
+### n06_colecoes_thread_safe ColecoesSeguras -
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+public class ColecoesSeguras {
+    public static void main(String[] args) throws InterruptedException {
+        List<Integer> sincronizada = Collections.synchronizedList(new ArrayList<>());
+        List<Integer> cow = new CopyOnWriteArrayList<>();
+        Runnable r = () -> { for (int i = 0; i < 100; i++) { sincronizada.add(i); cow.add(i); } };
+        Thread a = new Thread(r), b = new Thread(r);
+        a.start(); b.start(); a.join(); b.join();
+        System.out.println(sincronizada.size() + cow.size());
+    }
+}
+### n07_executor_encerrado ExecutorEncerrado -
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+public class ExecutorEncerrado {
+    public static void main(String[] args) throws InterruptedException {
+        ExecutorService ex = Executors.newFixedThreadPool(2);
+        ex.submit(() -> System.out.println("tarefa"));
+        ex.shutdown();
+        ex.awaitTermination(5, TimeUnit.SECONDS);
+    }
+}
+### n08_interrupcao_respeitada InterrupcaoRespeitada -
+public class InterrupcaoRespeitada {
+    public static void main(String[] args) throws InterruptedException {
+        Thread t = new Thread(() -> {
+            while (!Thread.currentThread().isInterrupted()) {
+                try { Thread.sleep(50); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            }
+        });
+        t.start();
+        Thread.sleep(200);
+        t.interrupt();
+        t.join();
+    }
+}
+### n09_flag_volatile FlagVolatile -
+public class FlagVolatile {
+    private volatile boolean rodando = true;
+    public void loop() { while (rodando) { Thread.onSpinWait(); } }
+    public void parar() { rodando = false; }
+    public static void main(String[] args) throws Exception {
+        FlagVolatile f = new FlagVolatile();
+        Thread t = new Thread(f::loop);
+        t.start();
+        Thread.sleep(100);
+        f.parar();
+        t.join();
+    }
+}
+### n11_reentrant_lock ContadorComLock -
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+public class ContadorComLock {
+    private static final Lock lock = new ReentrantLock();
+    private static int contador;
+    public static void main(String[] args) throws InterruptedException {
+        Runnable r = () -> {
+            for (int i = 0; i < 1000; i++) {
+                lock.lock();
+                try { contador++; } finally { lock.unlock(); }
+            }
+        };
+        Thread a = new Thread(r), b = new Thread(r);
+        a.start(); b.start(); a.join(); b.join();
+        System.out.println(contador);
+    }
+}
+### n12_lista_local_da_thread ListaLocal -
+import java.util.ArrayList;
+import java.util.List;
+public class ListaLocal {
+    public static void main(String[] args) {
+        Runnable r = () -> {
+            List<Integer> minha = new ArrayList<>();
+            for (int i = 0; i < 10; i++) minha.add(i);
+            System.out.println(minha.size());
+        };
+        new Thread(r).start();
+        new Thread(r).start();
+    }
+}
+### n13_concurrent_hash_map MapaConcorrente -
+import java.util.concurrent.ConcurrentHashMap;
+public class MapaConcorrente {
+    static final ConcurrentHashMap<String, Integer> contagem = new ConcurrentHashMap<>();
+    public static void main(String[] args) throws InterruptedException {
+        Runnable r = () -> { for (int i = 0; i < 100; i++) contagem.merge("k", 1, Integer::sum); };
+        Thread a = new Thread(r), b = new Thread(r);
+        a.start(); b.start(); a.join(); b.join();
+        System.out.println(contagem);
+    }
+}
+### n14_duas_threads_independentes DuasThreads -
+public class DuasThreads {
+    public static void main(String[] args) throws InterruptedException {
+        Thread t1 = new Thread(() -> System.out.println("Thread 1"));
+        Thread t2 = new Thread(() -> System.out.println("Thread 2"));
+        t1.start(); t2.start(); t1.join(); t2.join();
+    }
+}
+### n15_executor_try_with_resources ExecutorTryWithResources -
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+public class ExecutorTryWithResources {
+    public static void main(String[] args) {
+        try (ExecutorService ex = Executors.newFixedThreadPool(2)) {
+            ex.submit(() -> System.out.println("tarefa"));
+        }
+    }
+}
+### n16_transferencia_com_ordem_fixa BancoOrdenado -
+public class BancoOrdenado {
+    static class Conta { final int id; int saldo = 100; Conta(int id) { this.id = id; } }
+    static void transferir(Conta de, Conta para, int valor) {
+        Conta primeiro = de.id < para.id ? de : para;
+        Conta segundo = de.id < para.id ? para : de;
+        synchronized (primeiro) {
+            synchronized (segundo) {
+                de.saldo -= valor;
+                para.saldo += valor;
+            }
+        }
+    }
+    public static void main(String[] args) {
+        Conta a = new Conta(1), b = new Conta(2);
+        new Thread(() -> transferir(a, b, 10)).start();
+        new Thread(() -> transferir(b, a, 10)).start();
+    }
+}

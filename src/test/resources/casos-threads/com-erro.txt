@@ -1,0 +1,321 @@
+### 01_race_contador_estatico Corrida SRC_UNSYNCHRONIZED_SHARED_WRITE
+public class Corrida {
+    static int contador = 0;
+    public static void main(String[] args) throws InterruptedException {
+        Runnable r = () -> { for (int i = 0; i < 10000; i++) contador++; };
+        Thread a = new Thread(r), b = new Thread(r);
+        a.start(); b.start(); a.join(); b.join();
+        System.out.println(contador);
+    }
+}
+### 02_race_campo_instancia Conta SRC_UNSYNCHRONIZED_SHARED_WRITE
+public class Conta {
+    private int saldo = 100;
+    public void sacar(int v) { if (saldo >= v) saldo -= v; }
+    public static void main(String[] args) throws InterruptedException {
+        Conta c = new Conta();
+        Thread a = new Thread(() -> c.sacar(80)), b = new Thread(() -> c.sacar(80));
+        a.start(); b.start(); a.join(); b.join();
+        System.out.println(c.saldo);
+    }
+}
+### 03_sync_inconsistente Contador IS2_INCONSISTENT_SYNC
+public class Contador {
+    private int valor;
+    public synchronized void inc() { valor++; }
+    public synchronized void dec() { valor--; }
+    public int get() { return valor; }
+    public void reset() { valor = 0; }
+    public static void main(String[] args) { new Contador().inc(); }
+}
+### 04_deadlock_ordem_locks Deadlock SRC_LOCK_ORDER_DEADLOCK
+public class Deadlock {
+    static final Object A = new Object(), B = new Object();
+    public static void main(String[] args) {
+        new Thread(() -> { synchronized (A) { dormir(); synchronized (B) { System.out.println("t1"); } } }).start();
+        new Thread(() -> { synchronized (B) { dormir(); synchronized (A) { System.out.println("t2"); } } }).start();
+    }
+    static void dormir() { try { Thread.sleep(100); } catch (InterruptedException e) {} }
+}
+### 05_wait_fora_loop Fila WA_NOT_IN_LOOP
+import java.util.LinkedList;
+public class Fila {
+    private final LinkedList<Integer> itens = new LinkedList<>();
+    public synchronized int tirar() throws InterruptedException {
+        if (itens.isEmpty()) wait();
+        return itens.removeFirst();
+    }
+    public synchronized void por(int x) { itens.add(x); notifyAll(); }
+    public static void main(String[] args) {}
+}
+### 06_wait_sem_lock SemLock SRC_MONITOR_NOT_HELD
+public class SemLock {
+    private final Object lock = new Object();
+    public void esperar() throws InterruptedException { lock.wait(); }
+    public void avisar() { lock.notify(); }
+    public static void main(String[] args) {}
+}
+### 07_notify_vs_notifyall Notify NO_NOTIFY_NOT_NOTIFYALL
+public class Notify {
+    private boolean pronto;
+    public synchronized void esperar() throws InterruptedException { while (!pronto) wait(); }
+    public synchronized void liberar() { pronto = true; notify(); }
+    public static void main(String[] args) {}
+}
+### 08_run_em_vez_de_start RunDireto RU_INVOKE_RUN
+public class RunDireto {
+    public static void main(String[] args) {
+        Thread t = new Thread(() -> System.out.println("oi"));
+        t.run();
+    }
+}
+### 09_double_checked_locking Singleton DC_DOUBLECHECK
+public class Singleton {
+    private static Singleton instancia;
+    public static Singleton get() {
+        if (instancia == null) {
+            synchronized (Singleton.class) {
+                if (instancia == null) instancia = new Singleton();
+            }
+        }
+        return instancia;
+    }
+    public static void main(String[] args) { get(); }
+}
+### 10_sync_em_string_literal SyncString DL_SYNCHRONIZATION_ON_SHARED_CONSTANT
+public class SyncString {
+    private final String lock = "LOCK";
+    private final Integer lock2 = 0;
+    public void a() { synchronized (lock) { System.out.println("a"); } }
+    public void b() { synchronized (lock2) { System.out.println("b"); } }
+    public static void main(String[] args) {}
+}
+### 11_lock_nao_liberado LockSemUnlock UL_UNRELEASED_LOCK
+import java.util.concurrent.locks.ReentrantLock;
+public class LockSemUnlock {
+    private final ReentrantLock lock = new ReentrantLock();
+    private int x;
+    public void inc() { lock.lock(); x++; if (x > 10) return; lock.unlock(); }
+    public static void main(String[] args) {}
+}
+### 12_sleep_com_lock SleepLock SWL_SLEEP_WITH_LOCK_HELD
+public class SleepLock {
+    public synchronized void trabalhar() throws InterruptedException { Thread.sleep(1000); }
+    public static void main(String[] args) {}
+}
+### 13_flag_nao_volatile Flag SP_SPIN_ON_FIELD
+public class Flag {
+    private boolean rodando = true;
+    public void loop() { while (rodando) { } }
+    public void parar() { rodando = false; }
+    public static void main(String[] args) throws Exception {
+        Flag f = new Flag();
+        new Thread(f::loop).start();
+        Thread.sleep(100); f.parar();
+    }
+}
+### 14_check_then_act_concurrentmap CheckAct AT_OPERATION_SEQUENCE_ON_CONCURRENT_ABSTRACTION
+import java.util.concurrent.ConcurrentHashMap;
+public class CheckAct {
+    private final ConcurrentHashMap<String, Integer> m = new ConcurrentHashMap<>();
+    public void inc(String k) {
+        if (!m.containsKey(k)) m.put(k, 1);
+        else m.put(k, m.get(k) + 1);
+    }
+    public static void main(String[] args) {}
+}
+### 15_colecao_nao_thread_safe ListaCompartilhada SRC_NON_THREAD_SAFE_COLLECTION
+import java.util.ArrayList;
+import java.util.List;
+public class ListaCompartilhada {
+    public static void main(String[] args) throws InterruptedException {
+        List<Integer> lista = new ArrayList<>();
+        Runnable r = () -> { for (int i = 0; i < 1000; i++) lista.add(i); };
+        Thread a = new Thread(r), b = new Thread(r);
+        a.start(); b.start(); a.join(); b.join();
+        System.out.println(lista.size());
+    }
+}
+### 16_simpledateformat_estatico Datas STCAL_INVOKE_ON_STATIC_DATE_FORMAT_INSTANCE
+import java.text.SimpleDateFormat;
+import java.util.Date;
+public class Datas {
+    private static final SimpleDateFormat FMT = new SimpleDateFormat("dd/MM/yyyy");
+    public static String fmt(Date d) { return FMT.format(d); }
+    public static void main(String[] args) {}
+}
+### 17_sem_join SemJoin SRC_READ_WITHOUT_JOIN
+public class SemJoin {
+    static int resultado;
+    public static void main(String[] args) {
+        Thread t = new Thread(() -> resultado = 42);
+        t.start();
+        System.out.println(resultado);
+    }
+}
+### 18_excecao_nao_tratada_thread ExcecaoThread SRC_UNCAUGHT_EXCEPTION_IN_THREAD
+public class ExcecaoThread {
+    public static void main(String[] args) {
+        Thread t = new Thread(() -> { int x = 10 / 0; System.out.println(x); });
+        t.start();
+    }
+}
+### 19_volatile_increment VolInc VO_VOLATILE_INCREMENT
+public class VolInc {
+    private volatile int c;
+    public void inc() { c++; }
+    public static void main(String[] args) {}
+}
+### 20_start_no_construtor StartCtor SC_START_IN_CTOR
+public class StartCtor {
+    private int x;
+    public StartCtor() { new Thread(() -> System.out.println(x)).start(); x = 5; }
+    public static void main(String[] args) { new StartCtor(); }
+}
+### 21_sync_campo_mutavel SyncMutavel ML_SYNC_ON_FIELD_TO_GUARD_CHANGING_THAT_FIELD
+public class SyncMutavel {
+    private Object lock = new Object();
+    public void troca() { synchronized (lock) { lock = new Object(); } }
+    public static void main(String[] args) {}
+}
+### 22_interrupted_engolida Engole SRC_INTERRUPT_SWALLOWED_IN_LOOP
+public class Engole {
+    public static void main(String[] args) {
+        new Thread(() -> {
+            while (true) {
+                try { Thread.sleep(100); } catch (InterruptedException e) { }
+            }
+        }).start();
+    }
+}
+### 23_executor_sem_shutdown Executor SRC_EXECUTOR_NOT_SHUTDOWN
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+public class Executor {
+    public static void main(String[] args) {
+        ExecutorService ex = Executors.newFixedThreadPool(2);
+        ex.submit(() -> System.out.println("tarefa"));
+    }
+}
+### 24_await_fora_loop Condicao WA_AWAIT_NOT_IN_LOOP
+import java.util.concurrent.locks.*;
+public class Condicao {
+    private final Lock lock = new ReentrantLock();
+    private final Condition cheio = lock.newCondition();
+    private boolean temItem;
+    public void tirar() throws InterruptedException {
+        lock.lock();
+        try { if (!temItem) cheio.await(); temItem = false; } finally { lock.unlock(); }
+    }
+    public static void main(String[] args) {}
+}
+### 25_wait_sem_condicao WaitIncond NN_NAKED_NOTIFY
+public class WaitIncond {
+    public synchronized void esperar() throws InterruptedException { wait(); }
+    public synchronized void avisar() { notifyAll(); }
+    public static void main(String[] args) {}
+}
+### 26_notify_sem_mudanca_estado NakedNotify NN_NAKED_NOTIFY
+public class NakedNotify {
+    private boolean pronto;
+    public synchronized void esperar() throws InterruptedException { while (!pronto) wait(); }
+    public synchronized void avisar() { notifyAll(); }
+    public static void main(String[] args) {}
+}
+### 27_sync_getclass SyncGetClass WL_USING_GETCLASS_RATHER_THAN_CLASS_LITERAL
+public class SyncGetClass {
+    private static int n;
+    public void inc() { synchronized (getClass()) { n++; } }
+    public static void main(String[] args) {}
+}
+### 28_spin_campo Spin SP_SPIN_ON_FIELD
+public class Spin {
+    private boolean pronto;
+    public void esperar() { while (!pronto) { } }
+    public static void main(String[] args) {}
+}
+### 29_hashmap_estatico_compartilhado Cache SRC_NON_THREAD_SAFE_COLLECTION
+import java.util.HashMap;
+import java.util.Map;
+public class Cache {
+    private static final Map<String, String> cache = new HashMap<>();
+    public static void main(String[] args) {
+        for (int i = 0; i < 4; i++) {
+            final int n = i;
+            new Thread(() -> cache.put("k" + n, "v")).start();
+        }
+    }
+}
+### 30_runnable_campo_compartilhado Tarefa AT_NONATOMIC_OPERATIONS_ON_SHARED_VARIABLE
+public class Tarefa implements Runnable {
+    private int processados;
+    public void run() { for (int i = 0; i < 1000; i++) processados++; }
+    public static void main(String[] args) throws InterruptedException {
+        Tarefa t = new Tarefa();
+        Thread a = new Thread(t), b = new Thread(t);
+        a.start(); b.start(); a.join(); b.join();
+        System.out.println(t.processados);
+    }
+}
+### 31_divisao_por_zero_capturada Arquivo SRC_DIVISION_BY_ZERO
+public class Arquivo {
+    public static void main(String[] args) {
+        Thread t1 = new Thread(() -> {
+            try {
+                System.out.println("Thread 1 iniciada");
+                int resultado = 10 / 0;
+                System.out.println(resultado);
+            } catch (ArithmeticException e) {
+                System.out.println("Erro na Thread 1: " + e.getMessage());
+            }
+        });
+
+        Thread t2 = new Thread(() -> {
+            System.out.println("Thread 2 executando normalmente");
+        });
+
+        t1.start();
+        t2.start();
+    }
+}
+### 32_deadlock_transferencia Banco SRC_LOCK_ORDER_DEADLOCK
+public class Banco {
+    static class Conta { int saldo = 100; }
+    static void transferir(Conta de, Conta para, int valor) {
+        synchronized (de) {
+            synchronized (para) {
+                de.saldo -= valor;
+                para.saldo += valor;
+            }
+        }
+    }
+    public static void main(String[] args) {
+        Conta a = new Conta(), b = new Conta();
+        new Thread(() -> transferir(a, b, 10)).start();
+        new Thread(() -> transferir(b, a, 10)).start();
+    }
+}
+### 33_runnable_contador_estatico Trabalhador AT_NONATOMIC_OPERATIONS_ON_SHARED_VARIABLE
+public class Trabalhador implements Runnable {
+    static int total;
+    public void run() { for (int i = 0; i < 1000; i++) total++; }
+    public static void main(String[] args) throws InterruptedException {
+        Thread a = new Thread(new Trabalhador()), b = new Thread(new Trabalhador());
+        a.start(); b.start(); a.join(); b.join();
+        System.out.println(total);
+    }
+}
+### 34_executor_contador_compartilhado ContadorExecutor SRC_UNSYNCHRONIZED_SHARED_WRITE
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+public class ContadorExecutor {
+    static int contador;
+    public static void main(String[] args) throws InterruptedException {
+        ExecutorService ex = Executors.newFixedThreadPool(4);
+        for (int i = 0; i < 100; i++) ex.submit(() -> contador++);
+        ex.shutdown();
+        ex.awaitTermination(1, TimeUnit.SECONDS);
+        System.out.println(contador);
+    }
+}

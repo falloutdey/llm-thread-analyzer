@@ -215,7 +215,7 @@ public class LLMFeedbackService {
         sb.append("sem fornecer o código corrigido diretamente.\n\n");
 
         sb.append("REGRAS ABSOLUTAS:\n");
-        sb.append("1. Foque EXCLUSIVAMENTE no problema identificado abaixo pelo SpotBugs.\n");
+        sb.append("1. Foque EXCLUSIVAMENTE no problema identificado abaixo pela análise estática.\n");
         sb.append("2. Não mencione outros bugs ou vulnerabilidades que possa observar no código.\n");
         sb.append("3. Não forneça o código corrigido — apenas oriente o raciocínio.\n");
         sb.append("4. Responda SEMPRE em português do Brasil.\n");
@@ -251,7 +251,7 @@ public class LLMFeedbackService {
         }
 
         // === PROBLEMA DETECTADO ===
-        sb.append("PROBLEMA DETECTADO PELO SPOTBUGS:\n");
+        sb.append("PROBLEMA DETECTADO PELA ANÁLISE ESTÁTICA:\n");
         sb.append("- Descrição: ").append(erroSpotBugs).append("\n");
         if (numeroLinha > 0) {
             sb.append("- Linha: ").append(numeroLinha).append("\n");
@@ -272,7 +272,7 @@ public class LLMFeedbackService {
             sb.append("Tom encorajador e didático.]\n\n");
         }
         sb.append("Explicação:\n");
-        sb.append("[Explique o conceito de concorrência envolvido neste problema específico. ");
+        sb.append("[Explique o conceito envolvido neste problema específico (de concorrência, quando for o caso). ");
         sb.append("O que acontece quando este bug ocorre? Quais são as consequências em tempo de execução? ");
         sb.append("Use analogias se necessário. Máximo 3 parágrafos.]\n\n");
         sb.append("Como Corrigir:\n");

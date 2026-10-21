@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.Semaphore;
+import java.util.regex.Pattern;
 
 @Service
 public class CodeAnalysisService {
@@ -26,6 +27,8 @@ public class CodeAnalysisService {
     // Intervalo mínimo global entre o início de chamadas ao Gemini, inclusive
     // quando os alertas vêm de requisições HTTP diferentes.
     private static final long GEMINI_RATE_LIMIT_DELAY_MS = 4500;
+
+    private static final Pattern PADRAO_PACKAGE = Pattern.compile("(?m)^\\s*package\\s+[\\w.]+;\\s*\\n?");
 
     // O Semaphore(1) garante que apenas UMA thread faz a chamada ao LLM de cada vez,
     // independentemente de quantas requisições simultâneas o Spring Boot esteja a processar.
@@ -35,6 +38,9 @@ public class CodeAnalysisService {
 
     @Autowired
     private ConcurrencyIssuesDetector spotBugsDetector;
+
+    @Autowired
+    private SourceConcurrencyDetector sourceDetector;
 
     @Autowired
     private LLMFeedbackService llmFeedbackService;
@@ -61,7 +67,10 @@ public class CodeAnalysisService {
             tempDir = Files.createTempDirectory("thread-analyzer-");
             String caminhoFicheiroClass = compilarCodigo(sourceCode, tempDir);
 
-            List<ConcurrencyIssue> issues = spotBugsDetector.detectConcurrencyIssues(caminhoFicheiroClass);
+            List<ConcurrencyIssue> issues = SourceConcurrencyDetector.mesclar(
+                    spotBugsDetector.detectConcurrencyIssues(caminhoFicheiroClass),
+                    detetarNoCodigoFonte(caminhoFicheiroClass)
+            );
 
             for (int issueIndex = 0; issueIndex < issues.size(); issueIndex++) {
                 ConcurrencyIssue issue = issues.get(issueIndex);
@@ -109,6 +118,20 @@ public class CodeAnalysisService {
             if (tempDir != null) {
                 deletarDiretorioTemporario(tempDir);
             }
+        }
+    }
+
+    /**
+     * Complementa o SpotBugs com a análise do código-fonte.
+     * Uma falha aqui não deve impedir que os alertas do SpotBugs cheguem ao aluno.
+     */
+    private List<ConcurrencyIssue> detetarNoCodigoFonte(String diretorioFontes) {
+        try {
+            return sourceDetector.detectConcurrencyIssues(diretorioFontes);
+        } catch (RuntimeException e) {
+            System.err.println("[CodeAnalysis] Falha na análise do código-fonte (seguindo só com o SpotBugs): " + e.getMessage());
+            e.printStackTrace();
+            return List.of();
         }
     }
 
@@ -178,8 +201,10 @@ public class CodeAnalysisService {
         }
 
         // Remoção da declaração package antes de salvar o ficheiro.
-        String conteudoSanitizado = sourceCode.getContent()
-                .replaceAll("(?m)^\\s*package\\s+[\\w.]+;\\s*\\n?", "");
+        // As quebras de linha removidas são repostas para que os números de linha dos alertas
+        // continuem a coincidir com o código que o aluno vê no editor.
+        String conteudoSanitizado = PADRAO_PACKAGE.matcher(sourceCode.getContent())
+                .replaceAll(declaracao -> "\n".repeat((int) declaracao.group().chars().filter(c -> c == '\n').count()));
 
         File sourceFile = new File(tempDir.toFile(), nomeFicheiro);
 

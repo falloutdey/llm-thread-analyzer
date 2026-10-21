@@ -491,7 +491,7 @@ const IcoNewFolder = () => (
 ════════════════════════════════ */
 let _nextId = 1;
 const newId = () => {
-  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  if (window.crypto?.randomUUID) return window.crypto.randomUUID();
   return `java-file-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 };
 
@@ -1055,7 +1055,7 @@ const EditorJavaThreads = () => {
 
   const analisarCodigo = async () => {
     if (!codigoFonte.trim()) { alert('Escreva algum código Java antes de analisar.'); return; }
-    setIsAnalisando(true); setResultadoAnalise(null); setPainelOpen(true); setSidebarOpen(false);
+    setIsAnalisando(true); setResultadoAnalise(null); setPainelOpen(true);
     setTerminalLines([]); setStatusMsg('Analisando...'); setAlertCount(0);
     addTermLine(`$ javac ${nomeArquivoAtivo || 'CodigoAluno.java'}`, 'prompt');
     try {
@@ -1150,6 +1150,7 @@ const EditorJavaThreads = () => {
 
             <Panel
               ref={sidebarPanelRef}
+              id="sidebar" order={1}
               defaultSize={20} minSize={15} maxSize={35}
               collapsible
               collapsedSize={2}
@@ -1205,7 +1206,7 @@ const EditorJavaThreads = () => {
               </CollapseHandleBtn>
             </CollapseHandle>
 
-            <Panel style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+            <Panel id="editor" order={2} style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
               <EditorArea>
                 {!activeFile ? (
                   <WelcomeScreen>
@@ -1294,7 +1295,7 @@ const EditorJavaThreads = () => {
             {painelOpen && (
               <>
                 <PanelResizeHandle style={{ width: 5, background: theme.border, cursor: 'col-resize' }} />
-                <Panel defaultSize={30} minSize={20} maxSize={50} style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                <Panel id="painel-direito" order={3} defaultSize={30} minSize={20} maxSize={50} style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                   <RightPanelInner>
                     <PanelGroup direction="vertical" style={{ height: '100%' }}>
                       <Panel defaultSize={62} minSize={30} style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
