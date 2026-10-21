@@ -42,6 +42,16 @@ import java.util.stream.Collectors;
  *
  * Este detector percorre a árvore sintática do javac (já atribuída com tipos e símbolos)
  * para cobrir esses casos. Os alertas usam o prefixo SRC_ para se distinguirem dos do SpotBugs.
+ *
+ * Escopo: apenas problemas de concorrência. Erros gerais de lógica Java (ex.: divisão por zero)
+ * estão fora do escopo e não são reportados.
+ *
+ * Decisões de escopo pendentes:
+ * - Exceção não tratada dentro de uma thread (a thread termina sem aviso à thread principal):
+ *   ainda não há regra. É um tema de concorrência próprio, independente da divisão por zero.
+ * - Falso positivo conhecido do SpotBugs (AT_NONATOMIC_*) em subclasse de Thread com campo próprio,
+ *   lido pelo main depois do join(): o alerta é mantido. Uma supressão só deve voltar com
+ *   evidência positiva de que o objeto não escapa (alias, argumento) e de que todo start() é conhecido.
  */
 @Service
 public class SourceConcurrencyDetector {
@@ -157,7 +167,6 @@ public class SourceConcurrencyDetector {
         private final List<TreePath> invocacoes = new ArrayList<>();
         private final List<TreePath> sincronizados = new ArrayList<>();
         private final List<TreePath> capturas = new ArrayList<>();
-        private final List<TreePath> divisoes = new ArrayList<>();
         private final List<TreePath> lacos = new ArrayList<>();
 
         private final Map<Tree, Raiz> raizes = new LinkedHashMap<>();
@@ -184,7 +193,6 @@ public class SourceConcurrencyDetector {
             detectarFlagSemVolatile();
             detectarDeadlockPorOrdemDeLocks();
             detectarMonitorNaoAdquirido();
-            detectarDivisaoPorZero();
             detectarInterrupcaoIgnorada();
             detectarExecutorSemShutdown();
             return issues;
@@ -304,22 +312,6 @@ public class SourceConcurrencyDetector {
             public Void visitCatch(CatchTree node, Void p) {
                 capturas.add(getCurrentPath());
                 return super.visitCatch(node, p);
-            }
-
-            @Override
-            public Void visitBinary(BinaryTree node, Void p) {
-                if (node.getKind() == Tree.Kind.DIVIDE || node.getKind() == Tree.Kind.REMAINDER) {
-                    divisoes.add(getCurrentPath());
-                }
-                return super.visitBinary(node, p);
-            }
-
-            @Override
-            public Void visitCompoundAssignment(CompoundAssignmentTree node, Void p) {
-                if (node.getKind() == Tree.Kind.DIVIDE_ASSIGNMENT || node.getKind() == Tree.Kind.REMAINDER_ASSIGNMENT) {
-                    divisoes.add(getCurrentPath());
-                }
-                return super.visitCompoundAssignment(node, p);
             }
 
             @Override
@@ -652,33 +644,6 @@ public class SourceConcurrencyDetector {
                 reportar("SRC_MONITOR_NOT_HELD", invocacao,
                         "'" + nome + "()' é chamado em '" + nomeDoLock(monitor) + "' sem que a thread possua o monitor desse objeto "
                                 + "(falta synchronized(" + nomeDoLock(monitor) + ")); em tempo de execução isso lança IllegalMonitorStateException.");
-            }
-        }
-
-        /** Divisão inteira por zero constante — dentro de uma thread, encerra a thread sem aviso. */
-        private void detectarDivisaoPorZero() {
-            boolean temHandler = invocacoes.stream().map(i -> nomeDoMetodo((MethodInvocationTree) i.getLeaf()))
-                    .anyMatch(n -> n.equals("setUncaughtExceptionHandler") || n.equals("setDefaultUncaughtExceptionHandler"));
-            TypeMirror aritmetica = elements.getTypeElement("java.lang.ArithmeticException").asType();
-
-            for (TreePath divisao : divisoes) {
-                ExpressionTree divisor = divisao.getLeaf() instanceof BinaryTree binaria
-                        ? binaria.getRightOperand()
-                        : ((CompoundAssignmentTree) divisao.getLeaf()).getExpression();
-                if (!constanteZero(new TreePath(divisao, divisor)) || !tipoInteiro(trees.getTypeMirror(divisao))) continue;
-
-                Raiz raiz = raizDe(divisao);
-                boolean capturada = capturada(divisao, aritmetica);
-                if (raiz != null && raiz.entrada && !capturada && !temHandler) {
-                    reportar("SRC_UNCAUGHT_EXCEPTION_IN_THREAD", divisao,
-                            "Divisão inteira por zero dentro da thread, sem tratamento: a ArithmeticException encerra a thread "
-                                    + "abruptamente e o restante do trabalho dela não é executado.");
-                } else {
-                    reportar("SRC_DIVISION_BY_ZERO", divisao, capturada
-                            ? "Divisão inteira por zero: a operação sempre lança ArithmeticException, então o cálculo nunca "
-                                    + "produz resultado e o bloco catch é sempre executado."
-                            : "Divisão inteira por zero: a operação sempre lança ArithmeticException e interrompe a execução.");
-                }
             }
         }
 
@@ -1089,39 +1054,6 @@ public class SourceConcurrencyDetector {
             if (laco instanceof DoWhileLoopTree facaEnquanto) return facaEnquanto.getCondition();
             if (laco instanceof ForLoopTree para) return para.getCondition();
             return null;
-        }
-
-        private boolean constanteZero(TreePath expressao) {
-            TreePath p = semParenteses(expressao);
-            Object valor = p.getLeaf() instanceof LiteralTree literal
-                    ? literal.getValue()
-                    : trees.getElement(p) instanceof VariableElement variavel ? variavel.getConstantValue() : null;
-            return (valor instanceof Integer || valor instanceof Long || valor instanceof Short || valor instanceof Byte)
-                    && ((Number) valor).longValue() == 0L;
-        }
-
-        private boolean tipoInteiro(TypeMirror tipo) {
-            return tipo != null && switch (tipo.getKind()) {
-                case INT, LONG, SHORT, BYTE, CHAR -> true;
-                default -> false;
-            };
-        }
-
-        private boolean capturada(TreePath caminho, TypeMirror excecao) {
-            Tree filho = caminho.getLeaf();
-            for (TreePath p = caminho.getParentPath(); p != null; p = p.getParentPath()) {
-                Tree t = p.getLeaf();
-                if (t instanceof TryTree tentativa && tentativa.getBlock() == filho) {
-                    for (CatchTree captura : tentativa.getCatches()) {
-                        Element parametro = trees.getElement(new TreePath(new TreePath(p, captura), captura.getParameter()));
-                        if (parametro != null && tiposCapturados(parametro.asType()).stream()
-                                .anyMatch(tipo -> types.isSubtype(excecao, types.erasure(tipo)))) return true;
-                    }
-                }
-                if (ehFronteira(t)) return false;
-                filho = t;
-            }
-            return false;
         }
 
         private List<? extends TypeMirror> tiposCapturados(TypeMirror tipo) {

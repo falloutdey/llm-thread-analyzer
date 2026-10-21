@@ -200,3 +200,31 @@ public class BancoOrdenado {
         new Thread(() -> transferir(b, a, 10)).start();
     }
 }
+### n17_divisao_por_zero_na_thread ExcecaoThread -
+public class ExcecaoThread {
+    public static void main(String[] args) {
+        Thread t = new Thread(() -> { int x = 10 / 0; System.out.println(x); });
+        t.start();
+    }
+}
+### n18_divisao_por_zero_capturada Arquivo -
+public class Arquivo {
+    public static void main(String[] args) {
+        Thread t1 = new Thread(() -> {
+            try {
+                System.out.println("Thread 1 iniciada");
+                int resultado = 10 / 0;
+                System.out.println(resultado);
+            } catch (ArithmeticException e) {
+                System.out.println("Erro na Thread 1: " + e.getMessage());
+            }
+        });
+
+        Thread t2 = new Thread(() -> {
+            System.out.println("Thread 2 executando normalmente");
+        });
+
+        t1.start();
+        t2.start();
+    }
+}

@@ -272,7 +272,7 @@ public class LLMFeedbackService {
             sb.append("Tom encorajador e didático.]\n\n");
         }
         sb.append("Explicação:\n");
-        sb.append("[Explique o conceito envolvido neste problema específico (de concorrência, quando for o caso). ");
+        sb.append("[Explique o conceito de concorrência envolvido neste problema específico. ");
         sb.append("O que acontece quando este bug ocorre? Quais são as consequências em tempo de execução? ");
         sb.append("Use analogias se necessário. Máximo 3 parágrafos.]\n\n");
         sb.append("Como Corrigir:\n");

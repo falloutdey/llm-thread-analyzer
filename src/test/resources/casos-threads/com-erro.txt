@@ -153,13 +153,6 @@ public class SemJoin {
         System.out.println(resultado);
     }
 }
-### 18_excecao_nao_tratada_thread ExcecaoThread SRC_UNCAUGHT_EXCEPTION_IN_THREAD
-public class ExcecaoThread {
-    public static void main(String[] args) {
-        Thread t = new Thread(() -> { int x = 10 / 0; System.out.println(x); });
-        t.start();
-    }
-}
 ### 19_volatile_increment VolInc VO_VOLATILE_INCREMENT
 public class VolInc {
     private volatile int c;
@@ -257,27 +250,6 @@ public class Tarefa implements Runnable {
         System.out.println(t.processados);
     }
 }
-### 31_divisao_por_zero_capturada Arquivo SRC_DIVISION_BY_ZERO
-public class Arquivo {
-    public static void main(String[] args) {
-        Thread t1 = new Thread(() -> {
-            try {
-                System.out.println("Thread 1 iniciada");
-                int resultado = 10 / 0;
-                System.out.println(resultado);
-            } catch (ArithmeticException e) {
-                System.out.println("Erro na Thread 1: " + e.getMessage());
-            }
-        });
-
-        Thread t2 = new Thread(() -> {
-            System.out.println("Thread 2 executando normalmente");
-        });
-
-        t1.start();
-        t2.start();
-    }
-}
 ### 32_deadlock_transferencia Banco SRC_LOCK_ORDER_DEADLOCK
 public class Banco {
     static class Conta { int saldo = 100; }
@@ -317,5 +289,150 @@ public class ContadorExecutor {
         ex.shutdown();
         ex.awaitTermination(1, TimeUnit.SECONDS);
         System.out.println(contador);
+    }
+}
+### 35_thread_campo_lido_sem_join Parcial AT_NONATOMIC_64BIT_PRIMITIVE
+public class Parcial extends Thread {
+    private long soma;
+    @Override public void run() { for (int i = 0; i < 1000; i++) soma += i; }
+    public static void main(String[] args) {
+        Parcial p = new Parcial();
+        p.start();
+        System.out.println(p.soma);
+    }
+}
+### 36_thread_subclasse_compartilhada Contagem AT_NONATOMIC_OPERATIONS_ON_SHARED_VARIABLE
+public class Contagem extends Thread {
+    private int n;
+    @Override public void run() { for (int i = 0; i < 1000; i++) n++; }
+    public static void main(String[] args) throws InterruptedException {
+        Contagem c = new Contagem();
+        Thread a = new Thread(c), b = new Thread(c);
+        a.start(); b.start(); a.join(); b.join();
+        System.out.println(c.n);
+    }
+}
+### 37_thread_join_condicional Condicional AT_NONATOMIC_64BIT_PRIMITIVE
+public class Condicional extends Thread {
+    private long soma;
+    @Override public void run() { for (int i = 0; i < 1000; i++) soma += i; }
+    public static void main(String[] args) throws InterruptedException {
+        Condicional c = new Condicional();
+        c.start();
+        if (args.length > 0) c.join();
+        System.out.println(c.soma);
+    }
+}
+### 38_alias_runnable_compartilhado Contagem AT_NONATOMIC_OPERATIONS_ON_SHARED_VARIABLE
+public class Contagem extends Thread {
+    private int n;
+    @Override public void run() { for (int i = 0; i < 1000; i++) n++; }
+    public static void main(String[] args) throws InterruptedException {
+        Contagem c = new Contagem();
+        Runnable r = c;
+        Thread a = new Thread(r), b = new Thread(r);
+        a.start(); b.start(); a.join(); b.join();
+        System.out.println(c.n);
+    }
+}
+### 39_alias_thread_leitura_sem_join Somador AT_NONATOMIC_64BIT_PRIMITIVE
+public class Somador extends Thread {
+    private long soma;
+    @Override public void run() { for (int i = 0; i < 1000; i++) soma += i; }
+    public static void main(String[] args) {
+        Somador s = new Somador();
+        Thread t = s;
+        t.start();
+        System.out.println(s.soma);
+    }
+}
+### 40_start_no_construtor Auto AT_NONATOMIC_64BIT_PRIMITIVE
+public class Auto extends Thread {
+    private long soma;
+    public Auto() { start(); }
+    @Override public void run() { for (int i = 0; i < 1000; i++) soma += i; }
+    public static void main(String[] args) {
+        Auto a = new Auto();
+        System.out.println(a.soma);
+    }
+}
+### 41_start_em_metodo_auxiliar Ajudante AT_NONATOMIC_64BIT_PRIMITIVE
+public class Ajudante extends Thread {
+    private long soma;
+    public void iniciar() { start(); }
+    @Override public void run() { for (int i = 0; i < 1000; i++) soma += i; }
+    public static void main(String[] args) {
+        Ajudante a = new Ajudante();
+        a.iniciar();
+        System.out.println(a.soma);
+    }
+}
+### 42_join_em_try_catch_vazio Tentativa AT_NONATOMIC_64BIT_PRIMITIVE
+public class Tentativa extends Thread {
+    private long soma;
+    @Override public void run() { for (int i = 0; i < 1000; i++) soma += i; }
+    public static void main(String[] args) {
+        Tentativa t = new Tentativa();
+        t.start();
+        try { t.join(); } catch (InterruptedException e) { }
+        System.out.println(t.soma);
+    }
+}
+### 43_join_com_timeout Temporizado AT_NONATOMIC_64BIT_PRIMITIVE
+public class Temporizado extends Thread {
+    private long soma;
+    @Override public void run() { for (int i = 0; i < 1000; i++) soma += i; }
+    public static void main(String[] args) throws InterruptedException {
+        Temporizado t = new Temporizado();
+        t.start();
+        t.join(10);
+        System.out.println(t.soma);
+    }
+}
+### 44_mesma_linha_campos_diferentes Misto AT_NONATOMIC_64BIT_PRIMITIVE
+public class Misto extends Thread {
+    private static long total;
+    private long soma;
+    @Override public void run() { for (int i = 0; i < 1000; i++) { soma += i; total += i; } }
+    public static void main(String[] args) throws InterruptedException {
+        Misto a = new Misto(), b = new Misto();
+        a.start(); b.start(); a.join(); b.join();
+        System.out.println(a.soma + b.soma + total);
+    }
+}
+### 45_escrita_pelo_main_durante_execucao Escrita AT_NONATOMIC_64BIT_PRIMITIVE
+public class Escrita extends Thread {
+    private long soma;
+    @Override public void run() { for (int i = 0; i < 1000; i++) soma += i; }
+    public static void main(String[] args) throws InterruptedException {
+        Escrita e = new Escrita();
+        e.start();
+        e.soma = 0;
+        e.join();
+        System.out.println(e.soma);
+    }
+}
+### 46_falso_positivo_conhecido_thread_campo_proprio_long Somador AT_NONATOMIC_64BIT_PRIMITIVE
+public class Somador extends Thread {
+    private final int inicio, fim;
+    private long soma;
+    public Somador(int inicio, int fim) { this.inicio = inicio; this.fim = fim; }
+    @Override public void run() { for (int i = inicio; i < fim; i++) soma += i; }
+    public static void main(String[] args) throws InterruptedException {
+        Somador a = new Somador(0, 500), b = new Somador(500, 1000);
+        a.start(); b.start(); a.join(); b.join();
+        System.out.println(a.soma + b.soma);
+    }
+}
+### 47_falso_positivo_conhecido_thread_campo_proprio_int Somador AT_NONATOMIC_OPERATIONS_ON_SHARED_VARIABLE
+public class Somador extends Thread {
+    private final int inicio, fim;
+    private int soma;
+    public Somador(int inicio, int fim) { this.inicio = inicio; this.fim = fim; }
+    @Override public void run() { for (int i = inicio; i < fim; i++) soma += i; }
+    public static void main(String[] args) throws InterruptedException {
+        Somador a = new Somador(0, 500), b = new Somador(500, 1000);
+        a.start(); b.start(); a.join(); b.join();
+        System.out.println(a.soma + b.soma);
     }
 }

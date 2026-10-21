@@ -25,8 +25,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Bateria de cobertura dos erros de threads: cada caso é compilado e passa pelo SpotBugs
  * e pelo detector do código-fonte, exatamente como no endpoint /analisar (sem o LLM).
  *
- * com-erro.txt — cada caso tem de gerar o tipo de alerta indicado no cabeçalho.
- * sem-erro.txt — código correto: não pode gerar nenhum alerta (controlo de falsos positivos).
+ * com-erro.txt — cada caso tem de gerar o tipo de alerta indicado no cabeçalho. Inclui regressões
+ *                da supressão de alertas AT_ (casos 38 a 47), entre elas o falso positivo conhecido do
+ *                SpotBugs em subclasse de Thread com campo próprio, que é mantido de propósito.
+ * sem-erro.txt — exemplos sem alerta de concorrência esperado: não podem gerar nenhum alerta
+ *                (controlo de falsos positivos). Inclui casos fora do escopo de concorrência
+ *                (n17, n18: divisão por zero), que não são necessariamente código correto em geral.
+ *
+ * Em todos os casos, nenhum alerta do SpotBugs pode ser descartado na mesclagem com o código-fonte.
  *
  * Formato dos ficheiros: "### <nome> <Classe> <tipoEsperado>" seguido do código da classe.
  */
@@ -45,7 +51,7 @@ class CoberturaThreadsTest {
     }
 
     @TestFactory
-    Stream<DynamicTest> casosCorretosNaoGeramAlertas() throws IOException {
+    Stream<DynamicTest> casosSemAlertaDeConcorrenciaEsperado() throws IOException {
         return carregarCasos("/casos-threads/sem-erro.txt").stream().map(caso -> DynamicTest.dynamicTest(caso.nome(), () -> {
             List<ConcurrencyIssue> issues = analisar(caso);
             assertTrue(issues.isEmpty(), () -> caso.nome() + ": falso positivo " + descrever(issues));
@@ -63,9 +69,12 @@ class CoberturaThreadsTest {
                     "-g", "-proc:none", "-encoding", "UTF-8", fonte.toString());
             assertEquals(0, resultado, () -> caso.nome() + " não compilou:\n" + erros.toString(StandardCharsets.UTF_8));
 
-            return SourceConcurrencyDetector.mesclar(
-                    spotBugsDetector.detectConcurrencyIssues(diretorio.toString()),
-                    sourceDetector.detectConcurrencyIssues(diretorio.toString()));
+            List<ConcurrencyIssue> doSpotBugs = spotBugsDetector.detectConcurrencyIssues(diretorio.toString());
+            List<ConcurrencyIssue> mesclados = SourceConcurrencyDetector.mesclar(
+                    doSpotBugs, sourceDetector.detectConcurrencyIssues(diretorio.toString()));
+            assertTrue(mesclados.containsAll(doSpotBugs),
+                    () -> caso.nome() + ": a mesclagem descartou alerta do SpotBugs " + descrever(doSpotBugs) + " → " + descrever(mesclados));
+            return mesclados;
         } finally {
             try (Stream<Path> arquivos = Files.walk(diretorio)) {
                 arquivos.sorted(Comparator.reverseOrder()).map(Path::toFile).forEach(File::delete);
