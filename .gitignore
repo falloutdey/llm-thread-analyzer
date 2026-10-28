@@ -36,3 +36,5 @@ node_modules/
 build/
 .env
 .env.local
+# Banco H2 local com os registros das sessões (dados de alunos)
+dados/

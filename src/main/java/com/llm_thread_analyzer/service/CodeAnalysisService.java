@@ -50,6 +50,52 @@ public class CodeAnalysisService {
      * Usado pelo endpoint POST /api/files/analisar
      */
     public CodeAnalysisResults analisarCodigo(SourceCode sourceCode) {
+        List<ConcurrencyIssue> issues = detectarProblemas(sourceCode);
+
+        for (int issueIndex = 0; issueIndex < issues.size(); issueIndex++) {
+            ConcurrencyIssue issue = issues.get(issueIndex);
+            boolean semaphoreAcquired = false;
+            try {
+                GEMINI_SEMAPHORE.acquire();
+                semaphoreAcquired = true;
+                aguardarIntervaloMinimoEntreChamadasGemini();
+
+                String explicacao = llmFeedbackService.gerarFeedbackDidatico(
+                        issue.getMessage(),
+                        sourceCode.getContent(),
+                        issue.getLineNumber(),
+                        null  // histórico: null por ora — será passado quando o banco estiver conectado
+                );
+                issue.setInterpretation(explicacao);
+            } catch (LlmApiException e) {
+                // Falha do LLM marcada estruturalmente e não interrompe os outros issues.
+                System.err.println("[CodeAnalysis] Falha do LLM para issue #" + issueIndex + ": " + e.getMessage());
+                issue.setLlmError(true);
+                issue.setLlmErrorMessage(e.getMessage());
+            } catch (InterruptedException ie) {
+                // Repõe o estado de interrupção da thread.
+                Thread.currentThread().interrupt();
+                break;
+            } finally {
+                // A liberação fica garantida mesmo se o intervalo ou a chamada ao LLM
+                // for interrompida, evitando bloquear permanentemente as análises seguintes.
+                if (semaphoreAcquired) {
+                    GEMINI_SEMAPHORE.release();
+                }
+            }
+        }
+
+        return new CodeAnalysisResults(issues);
+    }
+
+    /**
+     * Só a parte estática: valida, compila e roda SpotBugs + regras no código-fonte.
+     * Não chama o LLM. Usado pelo tutor (POST /api/tutor/submissoes), que chama o LLM
+     * só quando o aluno abre a conversa de um alerta.
+     *
+     * Lança RuntimeException com prefixo ERRO_COMPILACAO: ou ERRO_ESTRUTURA: como antes.
+     */
+    public List<ConcurrencyIssue> detectarProblemas(SourceCode sourceCode) {
         if (sourceCode == null || sourceCode.getContent() == null || sourceCode.getContent().trim().isEmpty()) {
             throw new RuntimeException("O código fonte enviado está vazio ou num formato inválido.");
         }
@@ -67,45 +113,10 @@ public class CodeAnalysisService {
             tempDir = Files.createTempDirectory("thread-analyzer-");
             String caminhoFicheiroClass = compilarCodigo(sourceCode, tempDir);
 
-            List<ConcurrencyIssue> issues = SourceConcurrencyDetector.mesclar(
+            return SourceConcurrencyDetector.mesclar(
                     spotBugsDetector.detectConcurrencyIssues(caminhoFicheiroClass),
                     detetarNoCodigoFonte(caminhoFicheiroClass)
             );
-
-            for (int issueIndex = 0; issueIndex < issues.size(); issueIndex++) {
-                ConcurrencyIssue issue = issues.get(issueIndex);
-                boolean semaphoreAcquired = false;
-                try {
-                    GEMINI_SEMAPHORE.acquire();
-                    semaphoreAcquired = true;
-                    aguardarIntervaloMinimoEntreChamadasGemini();
-
-                    String explicacao = llmFeedbackService.gerarFeedbackDidatico(
-                            issue.getMessage(),
-                            sourceCode.getContent(),
-                            issue.getLineNumber(),
-                            null  // histórico: null por ora — será passado quando o banco estiver conectado
-                    );
-                    issue.setInterpretation(explicacao);
-                } catch (LlmApiException e) {
-                    // Falha do LLM marcada estruturalmente e não interrompe os outros issues.
-                    System.err.println("[CodeAnalysis] Falha do LLM para issue #" + issueIndex + ": " + e.getMessage());
-                    issue.setLlmError(true);
-                    issue.setLlmErrorMessage(e.getMessage());
-                } catch (InterruptedException ie) {
-                    // Repõe o estado de interrupção da thread.
-                    Thread.currentThread().interrupt();
-                    break;
-                } finally {
-                    // A liberação fica garantida mesmo se o intervalo ou a chamada ao LLM
-                    // for interrompida, evitando bloquear permanentemente as análises seguintes.
-                    if (semaphoreAcquired) {
-                        GEMINI_SEMAPHORE.release();
-                    }
-                }
-            }
-
-            return new CodeAnalysisResults(issues);
 
         } catch (RuntimeException e) {
             throw e;
