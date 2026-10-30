@@ -69,6 +69,10 @@ public class GeminiProvider extends LlmProvider {
         } else if (config.getThinkingBudget() != null) {
             generationConfig.put("thinkingConfig", Map.of("thinkingBudget", config.getThinkingBudget()));
         }
+        if (requisicao.esquemaJson() != null) {
+            generationConfig.put("responseMimeType", "application/json");
+            generationConfig.put("responseJsonSchema", requisicao.esquemaJson());
+        }
         corpo.put("generationConfig", generationConfig);
 
         String bruto = postarJson(url, Map.of("x-goog-api-key", config.getChave()), corpo, timeoutMs);

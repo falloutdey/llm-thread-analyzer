@@ -38,3 +38,6 @@ build/
 .env.local
 # Banco H2 local com os registros das sessões (dados de alunos)
 dados/
+
+# Resultados da bateria de robustez (gerados a cada rodada)
+scripts/robustez/resultados/

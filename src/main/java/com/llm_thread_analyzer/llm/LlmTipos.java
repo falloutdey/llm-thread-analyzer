@@ -1,6 +1,8 @@
 package com.llm_thread_analyzer.llm;
 
 import java.util.List;
+import java.util.Map;
+import java.util.function.Predicate;
 
 /**
  * Tipos de dados da camada de LLM, agrupados num só arquivo.
@@ -18,8 +20,16 @@ public final class LlmTipos {
     /**
      * Pedido ao modelo: instrução de sistema (persona + regras) e os turnos da conversa.
      * O último turno deve ser do USUARIO.
+     *
+     * @param esquemaJson JSON Schema da resposta; quando presente, o modelo é obrigado a responder em JSON
+     * @param validador   confere o texto devolvido; se recusar, o roteador trata como falha e tenta o próximo modelo
      */
-    public record Requisicao(String instrucaoSistema, List<Turno> turnos) {}
+    public record Requisicao(String instrucaoSistema, List<Turno> turnos,
+                             Map<String, Object> esquemaJson, Predicate<String> validador) {
+        public Requisicao(String instrucaoSistema, List<Turno> turnos) {
+            this(instrucaoSistema, turnos, null, null);
+        }
+    }
 
     /** Resposta bem-sucedida de um modelo. */
     public record Resposta(
@@ -39,6 +49,7 @@ public final class LlmTipos {
         SERVIDOR,         // 5xx
         BLOQUEADO,        // filtro de segurança do provedor
         RESPOSTA_VAZIA,   // veio sem texto (ex.: MAX_TOKENS sem conteúdo)
+        RESPOSTA_INVALIDA,// veio texto, mas fora do formato pedido (ex.: JSON quebrado)
         ERRO_CLIENTE,     // 4xx que não é 429 (chave inválida, modelo inexistente...)
         PRAZO_ESGOTADO,   // não havia mais tempo para tentar este modelo
         ERRO_REDE,        // falha de conexão, DNS, etc.

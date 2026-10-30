@@ -25,6 +25,21 @@ public interface EstrategiaPrompt {
      */
     Requisicao montar(Conversa conversa, List<Mensagem> historico);
 
+    /**
+     * O que o sistema extrai da resposta do modelo. Só "texto" é mostrado ao aluno;
+     * o resto é gravado na Mensagem para análise (nulo quando a versão não produz o campo).
+     */
+    record Interpretacao(String texto, Integer nivelDica, String avaliacaoAluno,
+                         String diagnostico, Boolean alunoDescreveuCorrecao) {}
+
+    /**
+     * Converte o texto devolvido pelo modelo no que vai para o aluno e para o banco.
+     * Padrão: o texto inteiro é a fala, sem campos extras (versão v1).
+     */
+    default Interpretacao interpretar(String textoModelo, Conversa conversa, List<Mensagem> historico) {
+        return new Interpretacao(textoModelo, null, null, null, null);
+    }
+
     /** Texto legível do pedido, para gravar em Mensagem.promptEnviado. */
     static String comoTexto(Requisicao r) {
         StringBuilder sb = new StringBuilder();

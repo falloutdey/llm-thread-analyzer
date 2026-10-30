@@ -57,6 +57,14 @@ public class Mensagem {
     private Boolean possivelCodigo;
     /** Nível de dica (para o prompt socrático). Nulo no prompt v1. */
     private Integer nivelDica;
+    /** Como o tutor avaliou a mensagem anterior do aluno (CORRETA, PARCIAL, INCORRETA...). Prompt v2. */
+    @Column(length = 30)
+    private String avaliacaoAluno;
+    /** Raciocínio interno do tutor sobre o aluno (o aluno não vê). Prompt v2. */
+    @Column(length = 4_000)
+    private String diagnostico;
+    /** O tutor julgou que o aluno já descreveu uma correção válida. Prompt v2. */
+    private Boolean alunoDescreveuCorrecao;
     @Column(length = 200_000)
     private String promptEnviado;
     @Column(length = 100_000)
@@ -97,6 +105,12 @@ public class Mensagem {
     public void setMotivoFim(String motivoFim) { this.motivoFim = motivoFim; }
     public Boolean getPossivelCodigo() { return possivelCodigo; }
     public void setPossivelCodigo(Boolean possivelCodigo) { this.possivelCodigo = possivelCodigo; }
+    public String getAvaliacaoAluno() { return avaliacaoAluno; }
+    public void setAvaliacaoAluno(String avaliacaoAluno) { this.avaliacaoAluno = avaliacaoAluno; }
+    public String getDiagnostico() { return diagnostico; }
+    public void setDiagnostico(String diagnostico) { this.diagnostico = diagnostico; }
+    public Boolean getAlunoDescreveuCorrecao() { return alunoDescreveuCorrecao; }
+    public void setAlunoDescreveuCorrecao(Boolean alunoDescreveuCorrecao) { this.alunoDescreveuCorrecao = alunoDescreveuCorrecao; }
     public Integer getNivelDica() { return nivelDica; }
     public void setNivelDica(Integer nivelDica) { this.nivelDica = nivelDica; }
     public String getPromptEnviado() { return promptEnviado; }

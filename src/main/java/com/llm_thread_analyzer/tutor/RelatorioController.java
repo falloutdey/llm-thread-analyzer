@@ -92,8 +92,41 @@ public class RelatorioController {
         r.put("falhasSemResposta", todasMsgs.stream().filter(m -> m.getTipo() == TutorEnums.TipoMensagem.FALHA_LLM).count());
         r.put("respostasCortadas", todasMsgs.stream().filter(m -> "MAX_TOKENS".equals(m.getMotivoFim())).count());
         r.put("respostasComPossivelCodigo", todasMsgs.stream().filter(m -> Boolean.TRUE.equals(m.getPossivelCodigo())).count());
+        List<Mensagem> falasTutor = todasMsgs.stream().filter(m -> m.getAutor() == TutorEnums.Autor.TUTOR).toList();
+        r.put("falasPorVersaoPrompt", falasTutor.stream().collect(Collectors.groupingBy(
+                m -> String.valueOf(m.getVersaoPrompt()), TreeMap::new, Collectors.counting())));
+        r.put("falasPorNivelDica", falasTutor.stream().filter(m -> m.getNivelDica() != null).collect(Collectors.groupingBy(
+                m -> "nivel " + m.getNivelDica(), TreeMap::new, Collectors.counting())));
+        r.put("avaliacoesDoAluno", falasTutor.stream().filter(m -> m.getAvaliacaoAluno() != null).collect(Collectors.groupingBy(
+                Mensagem::getAvaliacaoAluno, TreeMap::new, Collectors.counting())));
         r.put("porModelo", porModelo);
         return ResponseEntity.ok(r);
+    }
+
+    /** Conversa completa com os campos internos (nível, avaliação, diagnóstico, modelo). Para inspecionar o tutor. */
+    @GetMapping("/conversas/{id}")
+    public ResponseEntity<?> conversa(@PathVariable Long id,
+                                      @RequestParam(required = false) String token,
+                                      @RequestHeader(value = "X-Relatorio-Token", required = false) String cab) {
+        verificar(token, cab);
+        List<Map<String, Object>> falas = new ArrayList<>();
+        for (Mensagem m : mensagens.findByConversaIdOrderByOrdemAsc(id)) {
+            Map<String, Object> f = new LinkedHashMap<>();
+            f.put("ordem", m.getOrdem());
+            f.put("autor", m.getAutor());
+            f.put("tipo", m.getTipo());
+            f.put("versaoPrompt", m.getVersaoPrompt());
+            f.put("modelo", m.getModelo());
+            f.put("nivelDica", m.getNivelDica());
+            f.put("avaliacaoAluno", m.getAvaliacaoAluno());
+            f.put("alunoDescreveuCorrecao", m.getAlunoDescreveuCorrecao());
+            f.put("possivelCodigo", m.getPossivelCodigo());
+            f.put("latenciaTotalMs", m.getLatenciaTotalMs());
+            f.put("diagnostico", m.getDiagnostico());
+            f.put("texto", m.getTexto());
+            falas.add(f);
+        }
+        return ResponseEntity.ok(falas);
     }
 
     @GetMapping("/submissoes.csv")
@@ -133,7 +166,8 @@ public class RelatorioController {
         List<String> colunas = new ArrayList<>(List.of("mensagem_id", "conversa_id", "aluno_id", "submissao_id",
                 "alerta_tipo", "modo", "estado_conversa", "ordem", "autor", "tipo", "criada_em", "versao_prompt",
                 "provedor", "modelo", "nome_config", "usou_fallback", "num_tentativas", "latencia_total_ms",
-                "tokens_entrada", "tokens_saida", "motivo_fim", "possivel_codigo", "texto"));
+                "tokens_entrada", "tokens_saida", "motivo_fim", "possivel_codigo", "nivel_dica", "avaliacao_aluno",
+                "aluno_descreveu_correcao", "diagnostico", "texto"));
         if (incluirPrompt) colunas.add("prompt_enviado");
         Csv csv = new Csv(colunas.toArray(String[]::new));
 
@@ -143,7 +177,8 @@ public class RelatorioController {
                     c.getAlerta() == null ? null : c.getAlerta().getTipo(), c.getModo(), c.getEstado(),
                     m.getOrdem(), m.getAutor(), m.getTipo(), m.getCriadaEm(), m.getVersaoPrompt(),
                     m.getProvedor(), m.getModelo(), m.getNomeConfig(), m.getUsouFallback(), m.getNumeroTentativas(),
-                    m.getLatenciaTotalMs(), m.getTokensEntrada(), m.getTokensSaida(), m.getMotivoFim(), m.getPossivelCodigo(), m.getTexto()));
+                    m.getLatenciaTotalMs(), m.getTokensEntrada(), m.getTokensSaida(), m.getMotivoFim(), m.getPossivelCodigo(), m.getNivelDica(),
+                    m.getAvaliacaoAluno(), m.getAlunoDescreveuCorrecao(), m.getDiagnostico(), m.getTexto()));
             if (incluirPrompt) v.add(m.getPromptEnviado());
             csv.linha(v.toArray());
         }

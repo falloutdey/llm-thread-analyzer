@@ -112,6 +112,10 @@ public class LlmRouter {
                 long t0 = System.nanoTime();
                 try {
                     Resposta r = provider.gerar(requisicao, timeout);
+                    if (requisicao.validador() != null && !requisicao.validador().test(r.texto())) {
+                        throw new LlmException(MotivoFalha.RESPOSTA_INVALIDA,
+                                "Resposta fora do formato esperado: " + resumir(r.texto()));
+                    }
                     long lat = (System.nanoTime() - t0) / 1_000_000L;
                     tentativas.add(new Tentativa(ordem, provider.nomeConfig(), r.provedor(), r.modelo(),
                             true, null, null, lat, r.tokensEntrada(), r.tokensSaida()));

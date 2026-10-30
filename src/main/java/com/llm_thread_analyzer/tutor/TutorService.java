@@ -337,9 +337,14 @@ public class TutorService {
 
         if (r.sucesso()) {
             Tentativa ok = r.tentativas().get(r.tentativas().size() - 1);
+            EstrategiaPrompt.Interpretacao fala = estrategia.interpretar(r.resposta().texto(), c, historico);
             m.setAutor(Autor.TUTOR);
             m.setTipo(tipo);
-            m.setTexto(cortar(r.resposta().texto(), 20_000));
+            m.setTexto(cortar(fala.texto(), 20_000));
+            m.setNivelDica(fala.nivelDica());
+            m.setAvaliacaoAluno(cortar(fala.avaliacaoAluno(), 30));
+            m.setDiagnostico(cortar(fala.diagnostico(), 4_000));
+            m.setAlunoDescreveuCorrecao(fala.alunoDescreveuCorrecao());
             m.setProvedor(r.resposta().provedor());
             m.setModelo(r.resposta().modelo());
             m.setNomeConfig(ok.nomeConfig());
@@ -347,7 +352,7 @@ public class TutorService {
             m.setTokensSaida(r.resposta().tokensSaida());
             m.setMotivoFim(cortar(r.resposta().motivoFim(), 30));
             m.setRespostaBruta(cortar(r.resposta().respostaBruta(), 100_000));
-            m.setPossivelCodigo(GuardaCodigo.pareceCodigo(r.resposta().texto()));
+            m.setPossivelCodigo(GuardaCodigo.pareceCodigo(fala.texto()));
         } else {
             m.setAutor(Autor.SISTEMA);
             m.setTipo(TipoMensagem.FALHA_LLM);
