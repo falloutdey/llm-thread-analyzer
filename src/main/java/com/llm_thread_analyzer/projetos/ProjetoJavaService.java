@@ -1,10 +1,13 @@
 package com.llm_thread_analyzer.projetos;
 
+import com.llm_thread_analyzer.model.SourceCode;
 import com.llm_thread_analyzer.projetos.dto.ProjetosDtos.*;
 import com.llm_thread_analyzer.projetos.entity.ArquivoJava;
 import com.llm_thread_analyzer.projetos.entity.ProjetoJava;
 import com.llm_thread_analyzer.projetos.repository.ArquivoJavaRepository;
 import com.llm_thread_analyzer.projetos.repository.ProjetoJavaRepository;
+import com.llm_thread_analyzer.tutor.TutorService;
+import com.llm_thread_analyzer.tutor.dto.TutorDtos.SubmissaoResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -25,8 +28,12 @@ import java.util.regex.Pattern;
 @Service
 public class ProjetoJavaService {
 
-    /** Nome de classe Java simples + ".java" (sem pastas, sem pacote no nome). */
-    private static final Pattern NOME_ARQUIVO = Pattern.compile("[A-Za-z_$][A-Za-z0-9_$]{0,94}\\.java");
+    /**
+     * Caminho do arquivo no projeto: até 5 pastas (cada uma é uma parte do package) e o nome da
+     * classe + ".java". Ex.: "Main.java", "banco/Conta.java", "banco/modelo/Cliente.java".
+     */
+    private static final Pattern NOME_ARQUIVO = Pattern.compile("([A-Za-z_$][A-Za-z0-9_$]*/){0,5}[A-Za-z_$][A-Za-z0-9_$]*\\.java");
+    private static final int MAX_CARACTERES_NOME = 100;
 
     /** Palavras reservadas não podem ser nome de classe. */
     private static final Set<String> RESERVADAS = Set.of(
@@ -41,16 +48,18 @@ public class ProjetoJavaService {
 
     private final ProjetoJavaRepository projetos;
     private final ArquivoJavaRepository arquivos;
+    private final TutorService tutor;
     private final int maxProjetosPorAluno;
     private final int maxArquivosPorProjeto;
     private final int maxCaracteresArquivo;
 
-    public ProjetoJavaService(ProjetoJavaRepository projetos, ArquivoJavaRepository arquivos,
+    public ProjetoJavaService(ProjetoJavaRepository projetos, ArquivoJavaRepository arquivos, TutorService tutor,
                               @Value("${java.projetos.max-por-aluno:50}") int maxProjetosPorAluno,
                               @Value("${java.projetos.max-arquivos:30}") int maxArquivosPorProjeto,
                               @Value("${java.projetos.max-caracteres-arquivo:100000}") int maxCaracteresArquivo) {
         this.projetos = projetos;
         this.arquivos = arquivos;
+        this.tutor = tutor;
         this.maxProjetosPorAluno = maxProjetosPorAluno;
         this.maxArquivosPorProjeto = maxArquivosPorProjeto;
         this.maxCaracteresArquivo = maxCaracteresArquivo;
@@ -152,6 +161,29 @@ public class ProjetoJavaService {
         projeto.tocar();
     }
 
+    // ===================== Análise =====================
+
+    /**
+     * Analisa todos os arquivos do projeto juntos (packages e classes em arquivos diferentes) e
+     * registra a submissão do tutor com o aluno do token. Usa o que está salvo no banco:
+     * o editor salva antes de pedir a análise.
+     */
+    public SubmissaoResponse analisar(long idEstudante, long idProjeto, PedidoAnalise pedido) {
+        ProjetoJava projeto = projetoDoAluno(idEstudante, idProjeto);
+        List<ArquivoJava> lista = arquivos.findByProjetoOrderByNomeAsc(projeto);
+        if (lista.isEmpty()) {
+            throw new ProjetoException(HttpStatus.BAD_REQUEST, "O projeto não tem arquivos para analisar.");
+        }
+        String ativo = lista.stream()
+                .filter(a -> pedido != null && a.getId().equals(pedido.arquivoAtivoId()))
+                .map(ArquivoJava::getNome)
+                .findFirst()
+                .orElse(lista.get(0).getNome());
+        List<SourceCode> fontes = lista.stream().map(a -> new SourceCode(a.getNome(), a.getConteudo())).toList();
+        return tutor.submeterProjeto(String.valueOf(idEstudante), pedido == null ? null : pedido.sessaoId(),
+                projeto.getId(), fontes, ativo);
+    }
+
     // ===================== Apoio =====================
 
     private ProjetoJava projetoDoAluno(long idEstudante, long idProjeto) {
@@ -180,13 +212,18 @@ public class ProjetoJavaService {
 
     static String validarNomeArquivo(String nome) {
         String limpo = nome == null ? "" : nome.strip();
-        if (!NOME_ARQUIVO.matcher(limpo).matches()) {
+        if (limpo.length() > MAX_CARACTERES_NOME || !NOME_ARQUIVO.matcher(limpo).matches()) {
             throw new ProjetoException(HttpStatus.BAD_REQUEST,
-                    "Nome de arquivo inválido. Use o nome da classe seguido de .java (ex.: Contador.java), sem espaços, acentos ou pastas.");
+                    "Nome de arquivo inválido. Use o nome da classe seguido de .java (ex.: Contador.java). "
+                            + "Para colocar num package, use a pasta antes do nome (ex.: banco/Conta.java). "
+                            + "Sem espaços nem acentos.");
         }
-        String classe = limpo.substring(0, limpo.length() - ".java".length());
-        if (RESERVADAS.contains(classe)) {
-            throw new ProjetoException(HttpStatus.BAD_REQUEST, "\"" + classe + "\" é uma palavra reservada do Java e não pode ser nome de classe.");
+        String semExtensao = limpo.substring(0, limpo.length() - ".java".length());
+        for (String parte : semExtensao.split("/")) {
+            if (RESERVADAS.contains(parte)) {
+                throw new ProjetoException(HttpStatus.BAD_REQUEST,
+                        "\"" + parte + "\" é uma palavra reservada do Java e não pode ser nome de classe nem de package.");
+            }
         }
         return limpo;
     }
@@ -199,10 +236,13 @@ public class ProjetoJavaService {
         return conteudo;
     }
 
-    /** Mesmo modelo que o editor usa ao criar um arquivo .java. */
+    /** Modelo de um arquivo novo: a linha package (se estiver numa pasta) e uma classe com main(). */
     static String modelo(String nomeArquivo) {
-        String classe = nomeArquivo.substring(0, nomeArquivo.length() - ".java".length());
-        return "public class " + classe + " {\n\n"
+        String semExtensao = nomeArquivo.substring(0, nomeArquivo.length() - ".java".length());
+        int barra = semExtensao.lastIndexOf('/');
+        String classe = semExtensao.substring(barra + 1);
+        String pacote = barra < 0 ? "" : "package " + semExtensao.substring(0, barra).replace('/', '.') + ";\n\n";
+        return pacote + "public class " + classe + " {\n\n"
                 + "    public static void main(String[] args) {\n"
                 + "        // Escreva seu código aqui\n"
                 + "    }\n\n"

@@ -23,6 +23,9 @@ public class Submissao {
     @Column(length = 255)
     private String arquivo;
 
+    /** Projeto Java (módulo do Sumawma) da submissão; nulo nas submissões de um arquivo só. */
+    private Long projetoId;
+
     /** 1, 2, 3... por aluno + arquivo. */
     private int numeroTentativa;
 
@@ -50,6 +53,8 @@ public class Submissao {
     public String getSessaoId() { return sessaoId; }
     public void setSessaoId(String sessaoId) { this.sessaoId = sessaoId; }
     public String getArquivo() { return arquivo; }
+    public Long getProjetoId() { return projetoId; }
+    public void setProjetoId(Long projetoId) { this.projetoId = projetoId; }
     public void setArquivo(String arquivo) { this.arquivo = arquivo; }
     public int getNumeroTentativa() { return numeroTentativa; }
     public void setNumeroTentativa(int numeroTentativa) { this.numeroTentativa = numeroTentativa; }

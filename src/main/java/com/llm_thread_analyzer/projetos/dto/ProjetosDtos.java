@@ -23,6 +23,9 @@ public final class ProjetosDtos {
     /** Campos ausentes não são alterados. */
     public record AlterarArquivo(String nome, String conteudo) {}
 
+    /** arquivoAtivoId: arquivo aberto no editor (vai para o registro); sessaoId: sessão do editor. */
+    public record PedidoAnalise(Long arquivoAtivoId, String sessaoId) {}
+
     // ---------- Respostas ----------
 
     public record ProjetoResumo(Long id, String nome, Instant criadoEm, Instant atualizadoEm, long quantidadeArquivos) {

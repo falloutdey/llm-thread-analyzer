@@ -158,21 +158,109 @@ public class TutorService {
     }
 
     /**
-     * Compara com a submissão anterior (que compilou) do mesmo aluno e arquivo.
-     * Um alerta anterior é considerado resolvido se o mesmo TIPO não aparece mais na nova submissão.
+     * Submissão de um projeto do módulo Java do Sumawma: todos os arquivos são analisados juntos,
+     * e cada alerta guarda o arquivo de origem.
+     *
+     * O aluno vem do token de login (quem chama é o ProjetoJavaService), não do corpo da requisição.
+     *
+     * @param arquivos     caminho no projeto (ex.: "banco/Conta.java") e conteúdo de cada arquivo
+     * @param arquivoAtivo arquivo aberto no editor quando o aluno pediu a análise
+     */
+    public SubmissaoResponse submeterProjeto(String alunoId, String sessaoId, Long projetoId,
+                                             List<SourceCode> arquivos, String arquivoAtivo) {
+        String aluno = exigirAluno(alunoId);
+        if (arquivos == null || arquivos.isEmpty()) {
+            throw new TutorException(HttpStatus.BAD_REQUEST, "O projeto não tem arquivos para analisar.");
+        }
+        if (arquivos.stream().allMatch(a -> a.getContent() == null || a.getContent().isBlank())) {
+            throw new TutorException(HttpStatus.BAD_REQUEST, "O código enviado está vazio.");
+        }
+        Modo modo = lerModo(null);
+
+        Submissao s = new Submissao();
+        s.setAlunoId(aluno);
+        s.setSessaoId(cortar(sessaoId, 64));
+        s.setProjetoId(projetoId);
+        s.setArquivo(cortar(arquivoAtivo, 255));
+        s.setNumeroTentativa(submissoes.countByAlunoIdAndProjetoId(aluno, projetoId) + 1);
+        s.setCodigo(cortar(juntarArquivos(arquivos), 200_000));
+        s.setModo(modo);
+
+        long t0 = System.nanoTime();
+        List<ConcurrencyIssue> issues = List.of();
+        try {
+            issues = analise.detectarProblemasProjeto(arquivos);
+            s.setCompilou(true);
+        } catch (RuntimeException e) {
+            String msg = e.getMessage() == null ? "" : e.getMessage();
+            if (msg.startsWith("ERRO_COMPILACAO:") || msg.startsWith("ERRO_ESTRUTURA:")) {
+                s.setCompilou(false);
+                s.setErroCompilacao(cortar(msg.substring(msg.indexOf(':') + 1).trim(), 20_000));
+            } else if (msg.startsWith("Projeto demasiado longo") || msg.startsWith("Nome de arquivo inválido")
+                    || msg.startsWith("Arquivo repetido") || msg.startsWith("O projeto não tem")) {
+                throw new TutorException(HttpStatus.BAD_REQUEST, msg);
+            } else {
+                throw e;
+            }
+        }
+        s.setDuracaoAnaliseMs((System.nanoTime() - t0) / 1_000_000L);
+        s.setTotalAlertas(issues.size());
+        s = submissoes.save(s);
+
+        List<Alerta> novos = new ArrayList<>();
+        for (ConcurrencyIssue issue : issues) {
+            Alerta a = new Alerta();
+            a.setSubmissao(s);
+            a.setTipo(cortar(issue.getType(), 120));
+            a.setOrigem(issue.getType() != null && issue.getType().startsWith("SRC_") ? "FONTE" : "SPOTBUGS");
+            a.setLinha(issue.getLineNumber());
+            a.setMensagem(cortar(issue.getMessage(), 4_000));
+            a.setArquivo(cortar(issue.getFileName(), 255));
+            novos.add(alertas.save(a));
+        }
+
+        List<String> resolvidos = s.isCompilou() ? verificarResolucao(s, novos) : List.of();
+        List<AlertaDto> visiveis = modo == Modo.HIBRIDO
+                ? novos.stream().map(TutorService::paraDto).toList()
+                : List.of();
+        return new SubmissaoResponse(s.getId(), s.getNumeroTentativa(), modo.name(), s.isCompilou(),
+                s.getErroCompilacao(), visiveis, modo == Modo.HIBRIDO ? resolvidos : List.of());
+    }
+
+    /** Código guardado na submissão: o próprio arquivo, ou todos com um cabeçalho por arquivo. */
+    static String juntarArquivos(List<SourceCode> arquivos) {
+        if (arquivos.size() == 1) return arquivos.get(0).getContent();
+        StringBuilder sb = new StringBuilder();
+        for (SourceCode a : arquivos) {
+            sb.append("// ===== Arquivo: ").append(a.getFileName()).append(" =====\n")
+              .append(a.getContent() == null ? "" : a.getContent());
+            if (sb.charAt(sb.length() - 1) != '\n') sb.append('\n');
+            sb.append('\n');
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Compara com a submissão anterior (que compilou) do mesmo aluno e arquivo (ou do mesmo projeto).
+     * Um alerta anterior é considerado resolvido se o mesmo TIPO não aparece mais na nova submissão;
+     * no projeto, o mesmo tipo no mesmo arquivo.
      * (Comparar por tipo, e não por linha, porque as linhas mudam quando o aluno edita.)
      */
     private List<String> verificarResolucao(Submissao nova, List<Alerta> alertasNovos) {
-        Optional<Submissao> anterior = submissoes
-                .findFirstByAlunoIdAndArquivoAndCompilouTrueAndIdLessThanOrderByIdDesc(
+        boolean projeto = nova.getProjetoId() != null;
+        Optional<Submissao> anterior = projeto
+                ? submissoes.findFirstByAlunoIdAndProjetoIdAndCompilouTrueAndIdLessThanOrderByIdDesc(
+                        nova.getAlunoId(), nova.getProjetoId(), nova.getId())
+                : submissoes.findFirstByAlunoIdAndArquivoAndCompilouTrueAndIdLessThanOrderByIdDesc(
                         nova.getAlunoId(), nova.getArquivo(), nova.getId());
         if (anterior.isEmpty()) return List.of();
 
-        Set<String> tiposAtuais = alertasNovos.stream().map(Alerta::getTipo).collect(Collectors.toSet());
+        Function<Alerta, String> chave = projeto ? a -> a.getArquivo() + "|" + a.getTipo() : Alerta::getTipo;
+        Set<String> tiposAtuais = alertasNovos.stream().map(chave).collect(Collectors.toSet());
         Set<String> resolvidos = new LinkedHashSet<>();
 
         for (Alerta a : alertas.findBySubmissaoIdOrderByIdAsc(anterior.get().getId())) {
-            if (a.isResolvido() || tiposAtuais.contains(a.getTipo())) continue;
+            if (a.isResolvido() || tiposAtuais.contains(chave.apply(a))) continue;
             a.setResolvido(true);
             a.setResolvidoNaSubmissaoId(nova.getId());
             a.setResolvidoEm(Instant.now());
@@ -441,7 +529,7 @@ public class TutorService {
     }
 
     private static AlertaDto paraDto(Alerta a) {
-        return new AlertaDto(a.getId(), a.getTipo(), a.getOrigem(), a.getLinha(), a.getMensagem());
+        return new AlertaDto(a.getId(), a.getTipo(), a.getOrigem(), a.getLinha(), a.getMensagem(), a.getArquivo());
     }
 
     static String cortar(String s, int max) {

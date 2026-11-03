@@ -2,6 +2,8 @@ package com.llm_thread_analyzer.projetos;
 
 import com.llm_thread_analyzer.auth.AlunoAutenticado;
 import com.llm_thread_analyzer.projetos.dto.ProjetosDtos.*;
+import com.llm_thread_analyzer.tutor.TutorException;
+import com.llm_thread_analyzer.tutor.dto.TutorDtos.SubmissaoResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -24,6 +26,9 @@ import java.util.Map;
  *   POST   /api/java/projetos/{id}/arquivos  {nome, conteudo?}   cria arquivo
  *   PUT    /api/java/projetos/{id}/arquivos/{idArq}  {nome?, conteudo?}   salva e/ou renomeia
  *   DELETE /api/java/projetos/{id}/arquivos/{idArq}                       exclui arquivo
+ *   POST   /api/java/projetos/{id}/analises  {arquivoAtivoId?, sessaoId?}   analisa o projeto inteiro
+ *
+ * Nome de arquivo pode ter pastas, que são o package: "banco/Conta.java" (package banco).
  */
 @RestController
 @RequestMapping("/api/java/projetos")
@@ -85,7 +90,18 @@ public class ProjetoJavaController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/{idProjeto}/analises")
+    public SubmissaoResponse analisar(@AuthenticationPrincipal AlunoAutenticado aluno, @PathVariable long idProjeto,
+                                      @RequestBody(required = false) PedidoAnalise pedido) {
+        return service.analisar(aluno.idEstudante(), idProjeto, pedido);
+    }
+
     // ===================== Erros =====================
+
+    @ExceptionHandler(TutorException.class)
+    public ResponseEntity<Map<String, String>> erroDoTutor(TutorException e) {
+        return ResponseEntity.status(e.getStatus()).body(Map.of("erro", e.getMessage()));
+    }
 
     @ExceptionHandler(ProjetoException.class)
     public ResponseEntity<Map<String, String>> erroDeUso(ProjetoException e) {

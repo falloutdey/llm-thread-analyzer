@@ -25,7 +25,8 @@ public final class TutorDtos {
 
     // ---------- Saída ----------
 
-    public record AlertaDto(Long id, String tipo, String origem, int linha, String mensagem) {}
+    /** arquivo: caminho no projeto (ex.: "banco/Conta.java"); nulo na submissão de um arquivo só. */
+    public record AlertaDto(Long id, String tipo, String origem, int linha, String mensagem, String arquivo) {}
 
     public record SubmissaoResponse(
             Long submissaoId,

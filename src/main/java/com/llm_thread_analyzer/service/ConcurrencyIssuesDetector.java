@@ -7,13 +7,30 @@ import org.springframework.stereotype.Service;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class ConcurrencyIssuesDetector {
 
     public List<ConcurrencyIssue> detectConcurrencyIssues(String classFilePath) {
+        return analisar(classFilePath, false, null);
+    }
+
+    /**
+     * Análise de um projeto com packages: percorre as subpastas das classes e marca em cada alerta
+     * o arquivo de origem (ex.: "banco/Conta.java"), conforme o package e o nome do arquivo-fonte.
+     *
+     * @param arquivosDoProjeto caminhos dos arquivos do projeto; alerta de outro arquivo fica sem nome
+     */
+    public List<ConcurrencyIssue> detectConcurrencyIssuesProjeto(String classesDir, Set<String> arquivosDoProjeto) {
+        return analisar(classesDir, true, arquivosDoProjeto);
+    }
+
+    private List<ConcurrencyIssue> analisar(String classFilePath, boolean projeto, Set<String> arquivosDoProjeto) {
         List<ConcurrencyIssue> issues = new ArrayList<>();
 
         // classFilePath é o diretório temporário gerado pela compilação.
@@ -41,7 +58,8 @@ public class ConcurrencyIssuesDetector {
         Project project = new Project();
 
         // Adiciona todos os ficheiros .class do diretório ao projeto SpotBugs
-        File[] allClasses = classDir.listFiles((dir, name) -> name.endsWith(".class"));
+        // (no projeto, também os das subpastas dos packages).
+        File[] allClasses = projeto ? classesRecursivas(classDir) : classDir.listFiles((dir, name) -> name.endsWith(".class"));
         if (allClasses != null && allClasses.length > 0) {
             for (File cf : allClasses) {
                 project.addFile(cf.getAbsolutePath());
@@ -111,7 +129,15 @@ public class ConcurrencyIssuesDetector {
                         linha = bug.getPrimarySourceLineAnnotation().getStartLine();
                     }
 
-                    issues.add(new ConcurrencyIssue(type, linha, bug.getMessage()));
+                    ConcurrencyIssue issue = new ConcurrencyIssue(type, linha, bug.getMessage());
+                    if (projeto && bug.getPrimarySourceLineAnnotation() != null) {
+                        // getSourcePath() = package em pastas + arquivo-fonte, ex.: "banco/Conta.java"
+                        String origem = bug.getPrimarySourceLineAnnotation().getSourcePath();
+                        if (origem != null && arquivosDoProjeto != null && arquivosDoProjeto.contains(origem)) {
+                            issue.setFileName(origem);
+                        }
+                    }
+                    issues.add(issue);
                 }
             }
 
@@ -130,5 +156,13 @@ public class ConcurrencyIssuesDetector {
         }
 
         return issues;
+    }
+
+    private static File[] classesRecursivas(File raiz) {
+        try (var caminhos = Files.walk(raiz.toPath())) {
+            return caminhos.filter(c -> c.toString().endsWith(".class")).map(Path::toFile).sorted().toArray(File[]::new);
+        } catch (IOException e) {
+            throw new RuntimeException("[SpotBugs] Falha ao listar as classes: " + e.getMessage(), e);
+        }
     }
 }

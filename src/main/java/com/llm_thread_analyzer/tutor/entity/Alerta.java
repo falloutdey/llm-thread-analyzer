@@ -29,6 +29,10 @@ public class Alerta {
     @Column(length = 4_000)
     private String mensagem;
 
+    /** Arquivo do projeto onde está o alerta (ex.: "banco/Conta.java"); nulo na submissão de um arquivo só. */
+    @Column(length = 255)
+    private String arquivo;
+
     /** true quando a submissão seguinte do mesmo arquivo não tem mais alerta deste tipo. */
     private boolean resolvido;
 
@@ -40,6 +44,8 @@ public class Alerta {
     public Submissao getSubmissao() { return submissao; }
     public void setSubmissao(Submissao submissao) { this.submissao = submissao; }
     public String getTipo() { return tipo; }
+    public String getArquivo() { return arquivo; }
+    public void setArquivo(String arquivo) { this.arquivo = arquivo; }
     public void setTipo(String tipo) { this.tipo = tipo; }
     public String getOrigem() { return origem; }
     public void setOrigem(String origem) { this.origem = origem; }

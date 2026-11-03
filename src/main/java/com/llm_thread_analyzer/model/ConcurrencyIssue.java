@@ -1,5 +1,7 @@
 package com.llm_thread_analyzer.model;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 public class ConcurrencyIssue {
 
     private String type;
@@ -13,6 +15,11 @@ public class ConcurrencyIssue {
     // contaminando a métrica de acurácia silenciosamente.
     private boolean llmError = false;
     private String llmErrorMessage;
+
+    // Arquivo do projeto onde está o alerta (ex.: "banco/Conta.java"). Só é preenchido na análise
+    // de projeto com vários arquivos; fica fora do JSON quando nulo, para não mudar o formato de /analisar.
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private String fileName;
 
     public ConcurrencyIssue() {}
 
@@ -63,6 +70,10 @@ public class ConcurrencyIssue {
     public void setLlmError(boolean llmError) { 
         this.llmError = llmError; 
     }
+
+    public String getFileName() { return fileName; }
+
+    public void setFileName(String fileName) { this.fileName = fileName; }
 
     public String getLlmErrorMessage() { 
         return llmErrorMessage; 

@@ -193,10 +193,14 @@ class ProjetoJavaControllerTest {
     void validaNomeDeArquivo() throws Exception {
         long id = criarProjeto(700, "Nomes").get("id").asLong();
         String base = URL + "/" + id + "/arquivos";
-        for (String invalido : new String[]{"../Main.java", "pasta/Main.java", "Main.c", "Meu Arquivo.java",
-                "Ação.java", "1Main.java", "class.java", ".java", ""}) {
+        for (String invalido : new String[]{"../Main.java", "/Main.java", "pasta//Main.java", "pasta\\Main.java",
+                "Main.c", "Meu Arquivo.java", "Ação.java", "1Main.java", "class.java", "class/Main.java",
+                "a/b/c/d/e/f/Main.java", ".java", ""}) {
             chamar(post(base), 700, Map.of("nome", invalido)).andExpect(status().isBadRequest());
         }
+        // pastas são packages
+        chamar(post(base), 700, Map.of("nome", "banco/Conta.java")).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.conteudo", startsWith("package banco;")));
         // nome repetido, mesmo com maiúsculas diferentes (no Windows seriam o mesmo arquivo)
         chamar(post(base), 700, Map.of("nome", "main.java")).andExpect(status().isConflict());
     }

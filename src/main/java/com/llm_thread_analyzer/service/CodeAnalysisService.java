@@ -17,8 +17,11 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Semaphore;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Service
@@ -29,6 +32,14 @@ public class CodeAnalysisService {
     private static final long GEMINI_RATE_LIMIT_DELAY_MS = 4500;
 
     private static final Pattern PADRAO_PACKAGE = Pattern.compile("(?m)^\\s*package\\s+[\\w.]+;\\s*\\n?");
+
+    // Declaração de package para conferir com a pasta do arquivo, na análise de projeto.
+    private static final Pattern DECLARACAO_PACKAGE = Pattern.compile("(?m)^\\s*package\\s+([\\w.]+)\\s*;");
+
+    // Cada pasta do caminho e o nome da classe: identificadores Java simples.
+    private static final Pattern CAMINHO_ARQUIVO = Pattern.compile("([A-Za-z_$][A-Za-z0-9_$]*/)*[A-Za-z_$][A-Za-z0-9_$]*\\.java");
+
+    static final int MAX_CARACTERES_PROJETO = 200_000;
 
     // O Semaphore(1) garante que apenas UMA thread faz a chamada ao LLM de cada vez,
     // independentemente de quantas requisições simultâneas o Spring Boot esteja a processar.
@@ -129,6 +140,120 @@ public class CodeAnalysisService {
             if (tempDir != null) {
                 deletarDiretorioTemporario(tempDir);
             }
+        }
+    }
+
+    /**
+     * Análise de um projeto com vários arquivos, que podem estar em pastas (packages).
+     *
+     * Os arquivos são compilados juntos, mantendo a declaração package (que precisa bater com a
+     * pasta), e os alertas vêm com o arquivo de origem em getFileName(). Não chama o LLM.
+     * Erros seguem o padrão de detectarProblemas: prefixo ERRO_COMPILACAO: ou ERRO_ESTRUTURA:.
+     *
+     * @param arquivos nome = caminho no projeto (ex.: "banco/Conta.java"), conteúdo = código
+     */
+    public List<ConcurrencyIssue> detectarProblemasProjeto(List<SourceCode> arquivos) {
+        if (arquivos == null || arquivos.isEmpty()) {
+            throw new RuntimeException("O projeto não tem arquivos para analisar.");
+        }
+        long total = arquivos.stream().mapToLong(a -> a.getContent() == null ? 0 : a.getContent().length()).sum();
+        if (total > MAX_CARACTERES_PROJETO) {
+            throw new RuntimeException("Projeto demasiado longo para análise. Máximo permitido: " + MAX_CARACTERES_PROJETO
+                    + " caracteres somando todos os arquivos. Enviado: " + total + " caracteres.");
+        }
+
+        Set<String> caminhos = new LinkedHashSet<>();
+        List<String> pacotesErrados = new ArrayList<>();
+        for (SourceCode arquivo : arquivos) {
+            String caminho = arquivo.getFileName() == null ? "" : arquivo.getFileName().trim();
+            if (!CAMINHO_ARQUIVO.matcher(caminho).matches()) {
+                throw new RuntimeException("Nome de arquivo inválido no projeto: " + caminho);
+            }
+            if (!caminhos.add(caminho)) {
+                throw new RuntimeException("Arquivo repetido no projeto: " + caminho);
+            }
+            String esperado = caminho.contains("/") ? caminho.substring(0, caminho.lastIndexOf('/')).replace('/', '.') : "";
+            Matcher declarado = DECLARACAO_PACKAGE.matcher(arquivo.getContent() == null ? "" : arquivo.getContent());
+            String pacote = declarado.find() ? declarado.group(1) : "";
+            if (!pacote.equals(esperado)) {
+                pacotesErrados.add(esperado.isEmpty()
+                        ? caminho + ": está fora de qualquer pasta, então não deve ter a linha \"package " + pacote + ";\"."
+                        : caminho + ": está na pasta " + esperado.replace('.', '/') + ", então a primeira linha precisa ser \"package " + esperado + ";\""
+                                + (pacote.isEmpty() ? "." : " (hoje está \"package " + pacote + ";\")."));
+            }
+        }
+        if (!pacotesErrados.isEmpty()) {
+            throw new RuntimeException("ERRO_COMPILACAO:O package declarado não corresponde à pasta do arquivo:\n"
+                    + String.join("\n", pacotesErrados));
+        }
+
+        Path tempDir = null;
+        try {
+            tempDir = Files.createTempDirectory("thread-analyzer-projeto-");
+            Path fontes = tempDir.resolve("src");
+            Path classes = tempDir.resolve("classes");
+            Files.createDirectories(classes);
+
+            List<String> argumentos = new ArrayList<>(List.of("-g", "-proc:none", "-encoding", "UTF-8",
+                    "-d", classes.toString()));
+            for (SourceCode arquivo : arquivos) {
+                Path destino = fontes.resolve(arquivo.getFileName().trim()).normalize();
+                if (!destino.startsWith(fontes)) {
+                    throw new RuntimeException("Nome de arquivo inválido no projeto: " + arquivo.getFileName());
+                }
+                Files.createDirectories(destino.getParent());
+                Files.writeString(destino, arquivo.getContent(), java.nio.charset.StandardCharsets.UTF_8);
+                argumentos.add(destino.toString());
+            }
+
+            JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+            if (compiler == null) {
+                throw new RuntimeException("Compilador Java não encontrado. Certifique-se de estar a usar um JDK e não apenas um JRE.");
+            }
+            ByteArrayOutputStream erros = new ByteArrayOutputStream();
+            int resultado = compiler.run(null, null, erros, argumentos.toArray(String[]::new));
+            if (resultado != 0) {
+                // Tira o caminho da pasta temporária: o aluno vê "banco/Conta.java:3: error: ...".
+                String texto = erros.toString(java.nio.charset.StandardCharsets.UTF_8)
+                        .replace(fontes.toString() + File.separator, "");
+                if (File.separatorChar != '/') {
+                    for (String caminho : caminhos) {
+                        texto = texto.replace(caminho.replace('/', File.separatorChar), caminho);
+                    }
+                }
+                throw new RuntimeException("ERRO_COMPILACAO:" + texto);
+            }
+
+            try (var geradas = Files.walk(classes)) {
+                if (geradas.noneMatch(c -> c.toString().endsWith(".class"))) {
+                    throw new RuntimeException("ERRO_ESTRUTURA: O teu código compilou mas não gerou nenhuma classe analisável. "
+                            + "Certifica-te de que o código contém pelo menos uma declaração 'class' concreta.");
+                }
+            }
+
+            return SourceConcurrencyDetector.mesclar(
+                    spotBugsDetector.detectConcurrencyIssuesProjeto(classes.toString(), caminhos),
+                    detetarNoProjeto(fontes)
+            );
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException("Erro interno durante a análise do código: " + e.getMessage());
+        } finally {
+            if (tempDir != null) {
+                deletarDiretorioTemporario(tempDir);
+            }
+        }
+    }
+
+    private List<ConcurrencyIssue> detetarNoProjeto(Path fontes) {
+        try {
+            return sourceDetector.detectarNoProjeto(fontes);
+        } catch (RuntimeException e) {
+            System.err.println("[CodeAnalysis] Falha na análise do código-fonte do projeto (seguindo só com o SpotBugs): " + e.getMessage());
+            e.printStackTrace();
+            return List.of();
         }
     }
 
