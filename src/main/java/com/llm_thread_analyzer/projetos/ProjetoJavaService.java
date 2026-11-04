@@ -3,8 +3,10 @@ package com.llm_thread_analyzer.projetos;
 import com.llm_thread_analyzer.model.SourceCode;
 import com.llm_thread_analyzer.projetos.dto.ProjetosDtos.*;
 import com.llm_thread_analyzer.projetos.entity.ArquivoJava;
+import com.llm_thread_analyzer.projetos.entity.ExecucaoJava;
 import com.llm_thread_analyzer.projetos.entity.ProjetoJava;
 import com.llm_thread_analyzer.projetos.repository.ArquivoJavaRepository;
+import com.llm_thread_analyzer.projetos.repository.ExecucaoJavaRepository;
 import com.llm_thread_analyzer.projetos.repository.ProjetoJavaRepository;
 import com.llm_thread_analyzer.tutor.TutorService;
 import com.llm_thread_analyzer.tutor.dto.TutorDtos.SubmissaoResponse;
@@ -17,6 +19,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.regex.Pattern;
 
 /**
@@ -49,17 +52,22 @@ public class ProjetoJavaService {
     private final ProjetoJavaRepository projetos;
     private final ArquivoJavaRepository arquivos;
     private final TutorService tutor;
+    private final ExecutorJava executor;
+    private final ExecucaoJavaRepository execucoes;
     private final int maxProjetosPorAluno;
     private final int maxArquivosPorProjeto;
     private final int maxCaracteresArquivo;
 
     public ProjetoJavaService(ProjetoJavaRepository projetos, ArquivoJavaRepository arquivos, TutorService tutor,
+                              ExecutorJava executor, ExecucaoJavaRepository execucoes,
                               @Value("${java.projetos.max-por-aluno:50}") int maxProjetosPorAluno,
                               @Value("${java.projetos.max-arquivos:30}") int maxArquivosPorProjeto,
                               @Value("${java.projetos.max-caracteres-arquivo:100000}") int maxCaracteresArquivo) {
         this.projetos = projetos;
         this.arquivos = arquivos;
         this.tutor = tutor;
+        this.executor = executor;
+        this.execucoes = execucoes;
         this.maxProjetosPorAluno = maxProjetosPorAluno;
         this.maxArquivosPorProjeto = maxArquivosPorProjeto;
         this.maxCaracteresArquivo = maxCaracteresArquivo;
@@ -182,6 +190,96 @@ public class ProjetoJavaService {
         List<SourceCode> fontes = lista.stream().map(a -> new SourceCode(a.getNome(), a.getConteudo())).toList();
         return tutor.submeterProjeto(String.valueOf(idEstudante), pedido == null ? null : pedido.sessaoId(),
                 projeto.getId(), fontes, ativo);
+    }
+
+    /**
+     * Botão Executar: compila o projeto salvo e roda o main do arquivo aberto (ou o único main do projeto)
+     * num processo isolado (ver ExecutorJava), 1 vez ou 5 ("Executar 5 vezes"). Cada execução fica
+     * registrada para a pesquisa. Não é @Transactional: o programa pode rodar por vários segundos e
+     * não deve segurar conexão do banco.
+     */
+    public ExecucaoResponse executar(long idEstudante, long idProjeto, PedidoExecucao pedido) {
+        ProjetoJava projeto = projetoDoAluno(idEstudante, idProjeto);
+        List<ArquivoJava> lista = arquivos.findByProjetoOrderByNomeAsc(projeto);
+        if (lista.isEmpty()) {
+            throw new ProjetoException(HttpStatus.BAD_REQUEST, "O projeto não tem arquivos para executar.");
+        }
+        int repeticoes = pedido == null || pedido.repeticoes() == null ? 1 : pedido.repeticoes();
+        String ativo = lista.stream()
+                .filter(a -> pedido != null && a.getId().equals(pedido.arquivoAtivoId()))
+                .map(ArquivoJava::getNome)
+                .findFirst()
+                .orElse(null);
+        List<SourceCode> fontes = lista.stream().map(a -> new SourceCode(a.getNome(), a.getConteudo())).toList();
+        String grupo = UUID.randomUUID().toString();
+        String codigo = cortar(TutorService.juntarArquivos(fontes), 210_000);
+
+        ExecutorJava.Resultado r;
+        try {
+            r = executor.executar(fontes, ativo, repeticoes);
+        } catch (ProjetoException e) {
+            // Sem main, mais de um main etc.: registra a tentativa também (status 400), mas não a falta de vaga.
+            if (e.getStatus() == HttpStatus.BAD_REQUEST) {
+                ExecucaoJava registro = novoRegistro(idEstudante, projeto, pedido, ativo, codigo, grupo, repeticoes);
+                registro.setCompilou(true);
+                registro.setSaida(cortar(e.getMessage(), 20_000));
+                execucoes.save(registro);
+            }
+            throw e;
+        }
+
+        int numero = proximoNumero(idEstudante, projeto.getId());
+        if (r.rodadas().isEmpty()) {
+            // não compilou: uma linha só, sem saída
+            ExecucaoJava registro = novoRegistro(idEstudante, projeto, pedido, ativo, codigo, grupo, repeticoes);
+            registro.setNumeroExecucao(numero);
+            registro.setCompilou(r.compilou());
+            registro.setErroCompilacao(cortar(r.erroCompilacao(), 20_000));
+            execucoes.save(registro);
+        }
+        for (ExecutorJava.Rodada rodada : r.rodadas()) {
+            ExecucaoJava registro = novoRegistro(idEstudante, projeto, pedido, ativo, codigo, grupo, repeticoes);
+            registro.setNumeroExecucao(numero);
+            registro.setOrdemNoGrupo(rodada.ordem());
+            registro.setCompilou(true);
+            registro.setArquivoExecutado(r.arquivoExecutado());
+            registro.setClasseExecutada(cortar(r.classeExecutada(), 300));
+            registro.setCodigoSaida(rodada.codigoSaida());
+            registro.setDuracaoMs(rodada.duracaoMs());
+            registro.setInterrupcao(rodada.interrupcao() == null ? null : rodada.interrupcao().name());
+            registro.setSaidaCortada(rodada.saidaCortada());
+            registro.setSaida(cortar(rodada.saida(), 20_000));
+            execucoes.save(registro);
+        }
+
+        List<RodadaDto> rodadas = r.rodadas().stream()
+                .map(x -> new RodadaDto(x.ordem(), x.saida(), x.saidaCortada(), x.codigoSaida(), x.duracaoMs(),
+                        x.interrupcao() == null ? null : x.interrupcao().name(), x.aviso()))
+                .toList();
+        return new ExecucaoResponse(grupo, numero, r.compilou(), r.erroCompilacao(), r.arquivoExecutado(),
+                r.classeExecutada(), r.limiteSegundos(), r.repeticoesPedidas(), rodadas);
+    }
+
+    private ExecucaoJava novoRegistro(long idEstudante, ProjetoJava projeto, PedidoExecucao pedido, String ativo,
+                                      String codigo, String grupo, int repeticoes) {
+        ExecucaoJava registro = new ExecucaoJava();
+        registro.setIdEstudante(idEstudante);
+        registro.setProjetoId(projeto.getId());
+        registro.setSessaoId(cortar(pedido == null ? null : pedido.sessaoId(), 64));
+        registro.setArquivoAtivo(ativo);
+        registro.setCodigo(codigo);
+        registro.setGrupo(grupo);
+        registro.setRepeticoesPedidas(repeticoes);
+        registro.setNumeroExecucao(proximoNumero(idEstudante, projeto.getId()));
+        return registro;
+    }
+
+    private int proximoNumero(long idEstudante, long idProjeto) {
+        return (int) execucoes.contarCliques(idEstudante, idProjeto) + 1;
+    }
+
+    private static String cortar(String texto, int max) {
+        return texto == null || texto.length() <= max ? texto : texto.substring(0, max);
     }
 
     // ===================== Apoio =====================

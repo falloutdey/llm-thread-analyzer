@@ -67,7 +67,7 @@ public class TutorService {
                         List<EstrategiaPrompt> estrategias,
                         @Value("${tutor.versao-prompt:v1-explicativo}") String versaoPromptAtual,
                         @Value("${tutor.modo-padrao:HIBRIDO}") String modoPadrao,
-                        @Value("${tutor.max-mensagens-aluno:20}") int maxMensagensAluno,
+                        @Value("${tutor.max-mensagens-aluno:40}") int maxMensagensAluno,
                         @Value("${tutor.max-caracteres-mensagem:2000}") int maxCaracteresMensagem,
                         @Value("${tutor.permitir-fallback:true}") boolean permitirFallback) {
         this.analise = analise;
@@ -228,7 +228,7 @@ public class TutorService {
     }
 
     /** Código guardado na submissão: o próprio arquivo, ou todos com um cabeçalho por arquivo. */
-    static String juntarArquivos(List<SourceCode> arquivos) {
+    public static String juntarArquivos(List<SourceCode> arquivos) {
         if (arquivos.size() == 1) return arquivos.get(0).getContent();
         StringBuilder sb = new StringBuilder();
         for (SourceCode a : arquivos) {
@@ -256,11 +256,17 @@ public class TutorService {
         if (anterior.isEmpty()) return List.of();
 
         Function<Alerta, String> chave = projeto ? a -> a.getArquivo() + "|" + a.getTipo() : Alerta::getTipo;
-        Set<String> tiposAtuais = alertasNovos.stream().map(chave).collect(Collectors.toSet());
+        Map<String, Alerta> atuais = new LinkedHashMap<>();
+        for (Alerta n : alertasNovos) atuais.putIfAbsent(chave.apply(n), n);
         Set<String> resolvidos = new LinkedHashSet<>();
 
         for (Alerta a : alertas.findBySubmissaoIdOrderByIdAsc(anterior.get().getId())) {
-            if (a.isResolvido() || tiposAtuais.contains(chave.apply(a))) continue;
+            if (a.isResolvido()) continue;
+            Alerta continua = atuais.get(chave.apply(a));
+            if (continua != null) {
+                acompanharNovaAnalise(a, continua, nova);
+                continue;
+            }
             a.setResolvido(true);
             a.setResolvidoNaSubmissaoId(nova.getId());
             a.setResolvidoEm(Instant.now());
@@ -275,6 +281,31 @@ public class TutorService {
             }
         }
         return new ArrayList<>(resolvidos);
+    }
+
+    /**
+     * O alerta continua na nova análise: a conversa aberta sobre ele passa a olhar o código novo
+     * (o tutor vê a versão atual, e a escada de dicas continua de onde estava). A troca fica
+     * registrada como evento CONVERSA_ATUALIZADA, com a submissão e o alerta de antes e de depois.
+     */
+    private void acompanharNovaAnalise(Alerta antigo, Alerta novo, Submissao nova) {
+        for (Conversa c : conversas.findByAlertaIdAndEstado(antigo.getId(), EstadoConversa.ABERTA)) {
+            Evento e = new Evento();
+            e.setAlunoId(cortar(c.getAlunoId(), MAX_ALUNO_ID));
+            e.setSessaoId(cortar(nova.getSessaoId(), 64));
+            e.setTipo("CONVERSA_ATUALIZADA");
+            e.setDetalhe("submissao " + c.getSubmissao().getId() + " -> " + nova.getId()
+                    + "; alerta " + antigo.getId() + " -> " + novo.getId()
+                    + (antigo.getLinha() != novo.getLinha() ? "; linha " + antigo.getLinha() + " -> " + novo.getLinha() : ""));
+            e.setSubmissaoId(nova.getId());
+            e.setConversaId(c.getId());
+            eventos.save(e);
+
+            c.setSubmissao(nova);
+            c.setAlerta(novo);
+            conversas.save(c);
+            salvarAviso(c, "O código foi analisado de novo e este alerta continua aparecendo.");
+        }
     }
 
     // =====================================================================
@@ -381,6 +412,39 @@ public class TutorService {
             c.setEncerradaEm(Instant.now());
             conversas.save(c);
         }
+        return resposta(c);
+    }
+
+    /**
+     * Reflexão final: depois que a nova análise resolveu o alerta, o aluno explica com as palavras dele o que
+     * causava o problema e por que a mudança resolve. Fica gravada como mensagem REFLEXAO, sem chamar o modelo
+     * (é um dado sobre a compreensão do aluno). Uma por conversa.
+     */
+    public ConversaResponse registrarReflexao(Long conversaId, String alunoId, String texto) {
+        Conversa c = carregarConversaDoAluno(conversaId, alunoId);
+        if (c.getEstado() != EstadoConversa.RESOLVIDA) {
+            throw new TutorException(HttpStatus.CONFLICT, "A explicação final é pedida depois que o problema é resolvido.");
+        }
+        boolean jaTem = mensagens.findByConversaIdOrderByOrdemAsc(c.getId()).stream()
+                .anyMatch(m -> m.getTipo() == TipoMensagem.REFLEXAO);
+        if (jaTem) {
+            throw new TutorException(HttpStatus.CONFLICT, "Você já enviou a explicação desta conversa.");
+        }
+        String limpo = texto == null ? "" : texto.trim();
+        if (limpo.isEmpty()) {
+            throw new TutorException(HttpStatus.BAD_REQUEST, "Escreva a sua explicação antes de enviar.");
+        }
+        if (limpo.length() > maxCaracteresMensagem) {
+            throw new TutorException(HttpStatus.BAD_REQUEST,
+                    "Explicação longa demais (máximo " + maxCaracteresMensagem + " caracteres).");
+        }
+        Mensagem m = new Mensagem();
+        m.setConversa(c);
+        m.setOrdem(proximaOrdem(c));
+        m.setAutor(Autor.ALUNO);
+        m.setTipo(TipoMensagem.REFLEXAO);
+        m.setTexto(limpo);
+        mensagens.save(m);
         return resposta(c);
     }
 
@@ -506,7 +570,8 @@ public class TutorService {
         int restantes = (int) Math.max(0, maxMensagensAluno - doAluno);
         return new ConversaResponse(c.getId(), c.getSubmissao().getId(),
                 c.getAlerta() == null ? null : c.getAlerta().getId(),
-                c.getModo().name(), c.getEstado().name(), c.getVersaoPrompt(), dtos, falha, restantes);
+                c.getModo().name(), c.getEstado().name(), c.getVersaoPrompt(), dtos, falha, restantes,
+                c.getAlerta() == null ? null : paraDto(c.getAlerta()));
     }
 
     private Modo lerModo(String modo) {

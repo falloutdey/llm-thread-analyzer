@@ -27,7 +27,7 @@ public class Conversa {
     @Column(length = 64, nullable = false)
     private String alunoId;
 
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = ConversoresEnum.ModoTexto.class)
     @Column(length = 20)
     private Modo modo;
 
@@ -35,7 +35,7 @@ public class Conversa {
     @Column(length = 40)
     private String versaoPrompt;
 
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = ConversoresEnum.EstadoConversaTexto.class)
     @Column(length = 30)
     private EstadoConversa estado = EstadoConversa.ABERTA;
 

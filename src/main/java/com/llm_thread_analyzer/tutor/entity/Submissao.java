@@ -32,7 +32,7 @@ public class Submissao {
     @Column(length = 200_000)
     private String codigo;
 
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = ConversoresEnum.ModoTexto.class)
     @Column(length = 20)
     private Modo modo;
 

@@ -27,6 +27,7 @@ import java.util.Map;
  *   PUT    /api/java/projetos/{id}/arquivos/{idArq}  {nome?, conteudo?}   salva e/ou renomeia
  *   DELETE /api/java/projetos/{id}/arquivos/{idArq}                       exclui arquivo
  *   POST   /api/java/projetos/{id}/analises  {arquivoAtivoId?, sessaoId?}   analisa o projeto inteiro
+ *   POST   /api/java/projetos/{id}/execucoes {arquivoAtivoId?, sessaoId?, repeticoes?}   compila e executa 1 ou 5 vezes
  *
  * Nome de arquivo pode ter pastas, que são o package: "banco/Conta.java" (package banco).
  */
@@ -94,6 +95,12 @@ public class ProjetoJavaController {
     public SubmissaoResponse analisar(@AuthenticationPrincipal AlunoAutenticado aluno, @PathVariable long idProjeto,
                                       @RequestBody(required = false) PedidoAnalise pedido) {
         return service.analisar(aluno.idEstudante(), idProjeto, pedido);
+    }
+
+    @PostMapping("/{idProjeto}/execucoes")
+    public ExecucaoResponse executar(@AuthenticationPrincipal AlunoAutenticado aluno, @PathVariable long idProjeto,
+                                     @RequestBody(required = false) PedidoExecucao pedido) {
+        return service.executar(aluno.idEstudante(), idProjeto, pedido);
     }
 
     // ===================== Erros =====================

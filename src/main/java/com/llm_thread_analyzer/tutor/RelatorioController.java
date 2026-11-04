@@ -1,5 +1,7 @@
 package com.llm_thread_analyzer.tutor;
 
+import com.llm_thread_analyzer.projetos.entity.ExecucaoJava;
+import com.llm_thread_analyzer.projetos.repository.ExecucaoJavaRepository;
 import com.llm_thread_analyzer.llm.LlmRouter;
 import com.llm_thread_analyzer.tutor.entity.*;
 import com.llm_thread_analyzer.tutor.repository.*;
@@ -39,12 +41,14 @@ public class RelatorioController {
     private final MensagemRepository mensagens;
     private final ChamadaLlmRepository chamadas;
     private final EventoRepository eventos;
+    private final ExecucaoJavaRepository execucoes;
     private final LlmRouter llm;
 
     public RelatorioController(@Value("${relatorio.token:}") String token,
                                SubmissaoRepository submissoes, AlertaRepository alertas,
                                ConversaRepository conversas, MensagemRepository mensagens,
-                               ChamadaLlmRepository chamadas, EventoRepository eventos, LlmRouter llm) {
+                               ChamadaLlmRepository chamadas, EventoRepository eventos,
+                               ExecucaoJavaRepository execucoes, LlmRouter llm) {
         this.token = token;
         this.submissoes = submissoes;
         this.alertas = alertas;
@@ -52,6 +56,7 @@ public class RelatorioController {
         this.mensagens = mensagens;
         this.chamadas = chamadas;
         this.eventos = eventos;
+        this.execucoes = execucoes;
         this.llm = llm;
     }
 
@@ -210,6 +215,24 @@ public class RelatorioController {
                     e.getCriadoEm(), e.getDetalhe());
         }
         return csv.resposta("eventos.csv");
+    }
+
+    /** Cada execução do editor Java (código como estava e a saída); "Executar 5 vezes" gera 5 linhas do mesmo grupo. */
+    @GetMapping("/execucoes.csv")
+    public ResponseEntity<byte[]> execucoesCsv(@RequestParam(required = false) String token,
+                                               @RequestHeader(value = "X-Relatorio-Token", required = false) String cab) {
+        verificar(token, cab);
+        Csv csv = new Csv("execucao_id", "aluno_id", "sessao_id", "projeto_id", "numero_execucao", "grupo",
+                "ordem_no_grupo", "repeticoes_pedidas", "arquivo_ativo",
+                "arquivo_executado", "classe_executada", "compilou", "codigo_saida", "duracao_ms", "interrupcao",
+                "saida_cortada", "criada_em", "erro_compilacao", "saida", "codigo");
+        for (ExecucaoJava e : execucoes.findAll()) {
+            csv.linha(e.getId(), e.getIdEstudante(), e.getSessaoId(), e.getProjetoId(), e.getNumeroExecucao(),
+                    e.getGrupo(), e.getOrdemNoGrupo(), e.getRepeticoesPedidas(), e.getArquivoAtivo(), e.getArquivoExecutado(), e.getClasseExecutada(), e.isCompilou(),
+                    e.getCodigoSaida(), e.getDuracaoMs(), e.getInterrupcao(), e.isSaidaCortada(), e.getCriadaEm(),
+                    e.getErroCompilacao(), e.getSaida(), e.getCodigo());
+        }
+        return csv.resposta("execucoes.csv");
     }
 
     @ExceptionHandler(TutorException.class)

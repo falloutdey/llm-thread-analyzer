@@ -51,6 +51,8 @@ public final class TutorDtos {
             List<MensagemDto> mensagens,
             /** true quando a última fala é uma falha do LLM (o frontend pode oferecer "tentar novamente"). */
             boolean falhaLlm,
-            int mensagensRestantes
+            int mensagensRestantes,
+            /** Alerta atual da conversa (muda quando uma nova análise ainda aponta o mesmo problema). */
+            AlertaDto alerta
     ) {}
 }

@@ -153,6 +153,44 @@ public class CodeAnalysisService {
      * @param arquivos nome = caminho no projeto (ex.: "banco/Conta.java"), conteúdo = código
      */
     public List<ConcurrencyIssue> detectarProblemasProjeto(List<SourceCode> arquivos) {
+        Path tempDir = null;
+        try {
+            tempDir = Files.createTempDirectory("thread-analyzer-projeto-");
+            ProjetoCompilado compilado = compilarProjeto(arquivos, tempDir);
+
+            try (var geradas = Files.walk(compilado.classes())) {
+                if (geradas.noneMatch(c -> c.toString().endsWith(".class"))) {
+                    throw new RuntimeException("ERRO_ESTRUTURA: O teu código compilou mas não gerou nenhuma classe analisável. "
+                            + "Certifica-te de que o código contém pelo menos uma declaração 'class' concreta.");
+                }
+            }
+
+            return SourceConcurrencyDetector.mesclar(
+                    spotBugsDetector.detectConcurrencyIssuesProjeto(compilado.classes().toString(), compilado.caminhos()),
+                    detetarNoProjeto(compilado.fontes())
+            );
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException("Erro interno durante a análise do código: " + e.getMessage());
+        } finally {
+            if (tempDir != null) {
+                deletarDiretorioTemporario(tempDir);
+            }
+        }
+    }
+
+    /** Resultado de compilarProjeto: pasta com os .java (nos packages), pasta com os .class e os caminhos. */
+    public record ProjetoCompilado(Path fontes, Path classes, Set<String> caminhos) {}
+
+    /**
+     * Valida e compila o projeto dentro de {@code pasta} (que o chamador cria e apaga).
+     * Usado pela análise e pela execução, para as duas verem o mesmo erro de compilação.
+     * Erros: prefixo ERRO_COMPILACAO: (com o caminho do arquivo no projeto, sem a pasta temporária)
+     * ou RuntimeException com a mensagem para o aluno (projeto vazio, longo demais, nome inválido).
+     */
+    public ProjetoCompilado compilarProjeto(List<SourceCode> arquivos, Path pasta) throws IOException {
         if (arquivos == null || arquivos.isEmpty()) {
             throw new RuntimeException("O projeto não tem arquivos para analisar.");
         }
@@ -187,64 +225,41 @@ public class CodeAnalysisService {
                     + String.join("\n", pacotesErrados));
         }
 
-        Path tempDir = null;
-        try {
-            tempDir = Files.createTempDirectory("thread-analyzer-projeto-");
-            Path fontes = tempDir.resolve("src");
-            Path classes = tempDir.resolve("classes");
-            Files.createDirectories(classes);
+        Path fontes = pasta.resolve("src");
+        Path classes = pasta.resolve("classes");
+        Files.createDirectories(classes);
 
-            List<String> argumentos = new ArrayList<>(List.of("-g", "-proc:none", "-encoding", "UTF-8",
-                    "-d", classes.toString()));
-            for (SourceCode arquivo : arquivos) {
-                Path destino = fontes.resolve(arquivo.getFileName().trim()).normalize();
-                if (!destino.startsWith(fontes)) {
-                    throw new RuntimeException("Nome de arquivo inválido no projeto: " + arquivo.getFileName());
-                }
-                Files.createDirectories(destino.getParent());
-                Files.writeString(destino, arquivo.getContent(), java.nio.charset.StandardCharsets.UTF_8);
-                argumentos.add(destino.toString());
+        List<String> argumentos = new ArrayList<>(List.of("-g", "-proc:none", "-encoding", "UTF-8",
+                "-d", classes.toString()));
+        for (SourceCode arquivo : arquivos) {
+            Path destino = fontes.resolve(arquivo.getFileName().trim()).normalize();
+            if (!destino.startsWith(fontes)) {
+                throw new RuntimeException("Nome de arquivo inválido no projeto: " + arquivo.getFileName());
             }
-
-            JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
-            if (compiler == null) {
-                throw new RuntimeException("Compilador Java não encontrado. Certifique-se de estar a usar um JDK e não apenas um JRE.");
-            }
-            ByteArrayOutputStream erros = new ByteArrayOutputStream();
-            int resultado = compiler.run(null, null, erros, argumentos.toArray(String[]::new));
-            if (resultado != 0) {
-                // Tira o caminho da pasta temporária: o aluno vê "banco/Conta.java:3: error: ...".
-                String texto = erros.toString(java.nio.charset.StandardCharsets.UTF_8)
-                        .replace(fontes.toString() + File.separator, "");
-                if (File.separatorChar != '/') {
-                    for (String caminho : caminhos) {
-                        texto = texto.replace(caminho.replace('/', File.separatorChar), caminho);
-                    }
-                }
-                throw new RuntimeException("ERRO_COMPILACAO:" + texto);
-            }
-
-            try (var geradas = Files.walk(classes)) {
-                if (geradas.noneMatch(c -> c.toString().endsWith(".class"))) {
-                    throw new RuntimeException("ERRO_ESTRUTURA: O teu código compilou mas não gerou nenhuma classe analisável. "
-                            + "Certifica-te de que o código contém pelo menos uma declaração 'class' concreta.");
-                }
-            }
-
-            return SourceConcurrencyDetector.mesclar(
-                    spotBugsDetector.detectConcurrencyIssuesProjeto(classes.toString(), caminhos),
-                    detetarNoProjeto(fontes)
-            );
-        } catch (RuntimeException e) {
-            throw e;
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException("Erro interno durante a análise do código: " + e.getMessage());
-        } finally {
-            if (tempDir != null) {
-                deletarDiretorioTemporario(tempDir);
-            }
+            Files.createDirectories(destino.getParent());
+            Files.writeString(destino, arquivo.getContent() == null ? "" : arquivo.getContent(),
+                    java.nio.charset.StandardCharsets.UTF_8);
+            argumentos.add(destino.toString());
         }
+
+        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+        if (compiler == null) {
+            throw new RuntimeException("Compilador Java não encontrado. Certifique-se de estar a usar um JDK e não apenas um JRE.");
+        }
+        ByteArrayOutputStream erros = new ByteArrayOutputStream();
+        int resultado = compiler.run(null, null, erros, argumentos.toArray(String[]::new));
+        if (resultado != 0) {
+            // Tira o caminho da pasta temporária: o aluno vê "banco/Conta.java:3: error: ...".
+            String texto = erros.toString(java.nio.charset.StandardCharsets.UTF_8)
+                    .replace(fontes.toString() + File.separator, "");
+            if (File.separatorChar != '/') {
+                for (String caminho : caminhos) {
+                    texto = texto.replace(caminho.replace('/', File.separatorChar), caminho);
+                }
+            }
+            throw new RuntimeException("ERRO_COMPILACAO:" + texto);
+        }
+        return new ProjetoCompilado(fontes, classes, caminhos);
     }
 
     private List<ConcurrencyIssue> detetarNoProjeto(Path fontes) {
@@ -377,7 +392,7 @@ public class CodeAnalysisService {
         return tempDir.toAbsolutePath().toString();
     }
 
-    private void deletarDiretorioTemporario(Path tempDir) {
+    public void deletarDiretorioTemporario(Path tempDir) {
         try {
             Files.walk(tempDir)
                     .sorted(Comparator.reverseOrder())

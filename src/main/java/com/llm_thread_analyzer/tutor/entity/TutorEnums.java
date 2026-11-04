@@ -21,6 +21,7 @@ public final class TutorEnums {
         PEDIDO_DICA,     // aluno clicou em "quero uma dica"
         RESPOSTA,        // tutor respondendo ao aluno
         FALHA_LLM,       // nenhum modelo respondeu dentro do prazo
-        AVISO            // mensagem automática do sistema (ex.: alerta resolvido)
+        AVISO,           // mensagem automática do sistema (ex.: alerta resolvido)
+        REFLEXAO         // explicação final do aluno, com as palavras dele, depois que o alerta foi resolvido
     }
 }

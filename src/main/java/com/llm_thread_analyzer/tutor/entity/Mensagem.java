@@ -23,11 +23,11 @@ public class Mensagem {
 
     private int ordem;
 
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = ConversoresEnum.AutorTexto.class)
     @Column(length = 10)
     private Autor autor;
 
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = ConversoresEnum.TipoMensagemTexto.class)
     @Column(length = 20)
     private TipoMensagem tipo;
 
