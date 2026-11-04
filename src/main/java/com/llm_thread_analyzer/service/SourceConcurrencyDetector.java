@@ -27,7 +27,10 @@ import javax.tools.ToolProvider;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.*;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -124,20 +127,77 @@ public class SourceConcurrencyDetector {
     }
 
     /**
+     * Análise de um projeto com vários arquivos (e packages) já compilado com sucesso.
+     *
+     * Diferente do método acima, todas as unidades entram numa única análise: assim uma thread
+     * criada em Main.java que chama um método de banco/Conta.java é ligada à escrita no campo
+     * de Conta, e o alerta aponta para o arquivo e a linha certos.
+     *
+     * @param raizFontes pasta com os .java nas subpastas dos packages
+     * @return alertas com fileName relativo à raiz, com "/" (ex.: "banco/Conta.java")
+     */
+    public List<ConcurrencyIssue> detectarNoProjeto(Path raizFontes) {
+        List<File> fontes;
+        try (var arquivos = Files.walk(raizFontes)) {
+            fontes = arquivos.filter(f -> f.toString().endsWith(".java")).map(Path::toFile).sorted().toList();
+        } catch (IOException e) {
+            throw new RuntimeException("[Fonte] Falha ao ler o código-fonte: " + e.getMessage(), e);
+        }
+        if (fontes.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+        if (compiler == null) {
+            throw new RuntimeException("[Fonte] Compilador Java não encontrado. Certifique-se de estar a usar um JDK e não apenas um JRE.");
+        }
+
+        Path raiz = raizFontes.toAbsolutePath().normalize();
+        Function<CompilationUnitTree, String> nomeRelativo = unidade -> {
+            Path arquivo = Path.of(unidade.getSourceFile().toUri()).toAbsolutePath().normalize();
+            return raiz.relativize(arquivo).toString().replace('\\', '/');
+        };
+
+        try (StandardJavaFileManager fileManager = compiler.getStandardFileManager(null, null, StandardCharsets.UTF_8)) {
+            JavacTask task = (JavacTask) compiler.getTask(null, fileManager, diagnostico -> {},
+                    List.of("-proc:none", "-encoding", "UTF-8"), null, fileManager.getJavaFileObjectsFromFiles(fontes));
+            List<CompilationUnitTree> unidades = new ArrayList<>();
+            task.parse().forEach(unidades::add);
+            task.analyze();
+
+            List<ConcurrencyIssue> issues = new Analise(task, unidades, nomeRelativo).executar();
+            issues.sort(Comparator.comparing(ConcurrencyIssue::getFileName, Comparator.nullsFirst(Comparator.naturalOrder()))
+                    .thenComparingInt(ConcurrencyIssue::getLineNumber));
+
+            System.out.println("[Fonte] Issues de concorrência detetados no projeto: " + issues.size());
+            for (ConcurrencyIssue issue : issues) {
+                System.out.println("[Fonte] " + issue.getType() + " (" + issue.getFileName() + ", linha " + issue.getLineNumber() + ")");
+            }
+            return issues;
+        } catch (IOException e) {
+            throw new RuntimeException("[Fonte] Falha ao ler o código-fonte: " + e.getMessage(), e);
+        }
+    }
+
+    /**
      * Junta os alertas do SpotBugs com os do código-fonte, descartando os SRC_ que o SpotBugs
-     * já reportou na mesma linha, e ordena tudo pela linha.
+     * já reportou na mesma linha (do mesmo arquivo), e ordena tudo pelo arquivo e pela linha.
+     * Na análise de um arquivo só, o arquivo fica nulo em todos os alertas e nada muda.
      */
     public static List<ConcurrencyIssue> mesclar(List<ConcurrencyIssue> spotBugs, List<ConcurrencyIssue> fonte) {
         List<ConcurrencyIssue> resultado = new ArrayList<>(spotBugs);
         for (ConcurrencyIssue issueFonte : fonte) {
             List<String> prefixos = COBERTOS_PELO_SPOTBUGS.getOrDefault(issueFonte.getType(), List.of());
             boolean jaReportado = spotBugs.stream().anyMatch(s ->
-                    s.getLineNumber() == issueFonte.getLineNumber() && prefixos.stream().anyMatch(s.getType()::startsWith));
+                    Objects.equals(s.getFileName(), issueFonte.getFileName())
+                            && s.getLineNumber() == issueFonte.getLineNumber()
+                            && prefixos.stream().anyMatch(s.getType()::startsWith));
             if (!jaReportado) {
                 resultado.add(issueFonte);
             }
         }
-        resultado.sort(Comparator.comparingInt(ConcurrencyIssue::getLineNumber));
+        resultado.sort(Comparator.comparing(ConcurrencyIssue::getFileName, Comparator.nullsFirst(Comparator.naturalOrder()))
+                .thenComparingInt(ConcurrencyIssue::getLineNumber));
         return resultado;
     }
 
@@ -155,6 +215,11 @@ public class SourceConcurrencyDetector {
         private final Types types;
         private final Elements elements;
         private final CompilationUnitTree unidade;
+        private final List<CompilationUnitTree> unidades;
+        // Em projeto, cada nó da árvore pertence a uma das unidades; posição e linha dependem dela.
+        private final IdentityHashMap<Tree, CompilationUnitTree> unidadeDoNo = new IdentityHashMap<>();
+        // Nome do arquivo de cada unidade (nulo na análise de um arquivo só).
+        private final Function<CompilationUnitTree, String> nomeArquivo;
         private final SourcePositions posicoes;
 
         private final Map<Element, TreePath> metodos = new LinkedHashMap<>();
@@ -174,15 +239,38 @@ public class SourceConcurrencyDetector {
         private final List<ConcurrencyIssue> issues = new ArrayList<>();
 
         Analise(JavacTask task, CompilationUnitTree unidade) {
+            this(task, List.of(unidade), null);
+        }
+
+        Analise(JavacTask task, List<CompilationUnitTree> unidades, Function<CompilationUnitTree, String> nomeArquivo) {
             this.trees = Trees.instance(task);
             this.types = task.getTypes();
             this.elements = task.getElements();
-            this.unidade = unidade;
+            this.unidade = unidades.get(0);
+            this.unidades = unidades;
+            this.nomeArquivo = nomeArquivo;
             this.posicoes = trees.getSourcePositions();
+            if (unidades.size() > 1) {
+                for (CompilationUnitTree u : unidades) {
+                    new TreeScanner<Void, Void>() {
+                        @Override
+                        public Void scan(Tree tree, Void p) {
+                            if (tree != null) unidadeDoNo.put(tree, u);
+                            return super.scan(tree, p);
+                        }
+                    }.scan(u, null);
+                }
+            }
+        }
+
+        private CompilationUnitTree unidadeDe(Tree tree) {
+            return unidadeDoNo.isEmpty() ? unidade : unidadeDoNo.getOrDefault(tree, unidade);
         }
 
         List<ConcurrencyIssue> executar() {
-            new Coletor().scan(unidade, null);
+            for (CompilationUnitTree u : unidades) {
+                new Coletor().scan(u, null);
+            }
             identificarRaizes();
             propagarChamadas();
             coletarAcessos();
@@ -1175,18 +1263,22 @@ public class SourceConcurrencyDetector {
         }
 
         private long inicio(Tree tree) {
-            return posicoes.getStartPosition(unidade, tree);
+            return posicoes.getStartPosition(unidadeDe(tree), tree);
         }
 
         private int linha(Tree tree) {
-            return (int) unidade.getLineMap().getLineNumber(inicio(tree));
+            return (int) unidadeDe(tree).getLineMap().getLineNumber(inicio(tree));
         }
 
         private void reportar(String tipo, TreePath caminho, String mensagem) {
             int linha = linha(caminho.getLeaf());
-            boolean repetido = issues.stream().anyMatch(i -> i.getType().equals(tipo) && i.getLineNumber() == linha);
+            String arquivo = nomeArquivo == null ? null : nomeArquivo.apply(caminho.getCompilationUnit());
+            boolean repetido = issues.stream().anyMatch(i -> i.getType().equals(tipo) && i.getLineNumber() == linha
+                    && Objects.equals(i.getFileName(), arquivo));
             if (!repetido) {
-                issues.add(new ConcurrencyIssue(tipo, linha, mensagem));
+                ConcurrencyIssue issue = new ConcurrencyIssue(tipo, linha, mensagem);
+                issue.setFileName(arquivo);
+                issues.add(issue);
             }
         }
     }
