@@ -32,12 +32,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "gemini.api.key=teste",
         "java.projetos.max-por-aluno=3",
         "java.projetos.max-arquivos=3",
-        "java.projetos.max-caracteres-arquivo=50"
+        "java.projetos.max-caracteres-arquivo=50",
+        "relatorio.token=" + ProjetoJavaControllerTest.TOKEN_RELATORIO
 })
 @AutoConfigureMockMvc
 class ProjetoJavaControllerTest {
 
     static final String SEGREDO = "segredo-de-teste-do-sumawma";
+    static final String TOKEN_RELATORIO = "token-de-relatorio-do-teste";
     private static final String URL = "/api/java/projetos";
 
     @Autowired private MockMvc mvc;
@@ -102,9 +104,12 @@ class ProjetoJavaControllerTest {
     }
 
     @Test
-    void rotasAntigasContinuamSemLogin() throws Exception {
-        // /api/tutor e /api/files não passam a exigir login (só /api/java/**).
-        mvc.perform(get("/api/tutor/conversas/999999"))
+    void rotasAntigasDoTutorExigemOTokenDosRelatorios() throws Exception {
+        // /api/tutor/** não usa o login do Sumawma: só passa com o cabeçalho X-Relatorio-Token (bateria de robustez).
+        mvc.perform(get("/api/tutor/conversas/999999")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/tutor/conversas/999999").header("X-Relatorio-Token", "errado"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/tutor/conversas/999999").header("X-Relatorio-Token", TOKEN_RELATORIO))
                 .andExpect(status().is(not(401)));
     }
 

@@ -48,9 +48,19 @@ public class OpenAiCompatProvider extends LlmProvider {
         corpo.put("messages", mensagens);
         corpo.put("temperature", config.getTemperatura());
         corpo.put("max_tokens", config.getMaxTokens());
+        if (config.getEsforco() != null && !config.getEsforco().isBlank()) {
+            // Modelos com raciocínio (ex.: gpt-oss na Groq): low responde mais rápido.
+            corpo.put("reasoning_effort", config.getEsforco());
+        }
         if (requisicao.esquemaJson() != null) {
-            // Nem todo provedor compatível aceita json_schema; json_object é o denominador comum.
-            corpo.put("response_format", Map.of("type", "json_object"));
+            if (config.isEsquemaEstrito()) {
+                // Decodificação restrita ao esquema (ex.: gpt-oss na Groq): JSON sempre válido e campos com os valores previstos.
+                corpo.put("response_format", Map.of("type", "json_schema", "json_schema", Map.of(
+                        "name", "resposta_tutor", "strict", true, "schema", EsquemaEstrito.adaptar(requisicao.esquemaJson()))));
+            } else {
+                // Nem todo provedor compatível aceita json_schema; json_object é o denominador comum.
+                corpo.put("response_format", Map.of("type", "json_object"));
+            }
         }
 
         String bruto = postarJson(config.getUrl(), Map.of("Authorization", "Bearer " + config.getChave()), corpo, timeoutMs);

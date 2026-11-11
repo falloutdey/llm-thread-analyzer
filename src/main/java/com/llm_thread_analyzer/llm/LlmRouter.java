@@ -14,7 +14,9 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -27,7 +29,9 @@ import java.util.concurrent.ConcurrentHashMap;
  *   3. Chama o modelo com timeout = menor entre timeout-chamada-ms e o tempo que resta.
  *   4. Falha temporária (503, timeout, rede): tenta de novo no mesmo modelo, se configurado.
  *   5. Qualquer outra falha, ou tentativas esgotadas: passa ao próximo modelo (se o fallback estiver ligado).
- *   6. Cada tentativa vira um registro (Tentativa), com ou sem sucesso.
+ *   6. Se todos falharam e ainda há prazo, percorre a cadeia de novo (llm.voltas-na-cadeia), pulando
+ *      os modelos que tiveram falha definitiva. Isso cobre picos de 503 que atingem os dois modelos juntos.
+ *   7. Cada tentativa vira um registro (Tentativa), com ou sem sucesso.
  */
 @Service
 public class LlmRouter {
@@ -57,6 +61,7 @@ public class LlmRouter {
             LlmProvider p = switch (cfg.getTipo() == null ? "gemini" : cfg.getTipo().toLowerCase()) {
                 case "gemini" -> new GeminiProvider(nome, cfg, http, json);
                 case "openai" -> new OpenAiCompatProvider(nome, cfg, http, json);
+                case "anthropic" -> new AnthropicProvider(nome, cfg, http, json);
                 default -> null;
             };
             if (p == null) {
@@ -94,12 +99,35 @@ public class LlmRouter {
 
         boolean usarFallback = permitirFallback && props.isFallbackHabilitado();
         List<LlmProvider> candidatos = usarFallback ? cadeia : cadeia.subList(0, 1);
-        int ordem = 0;
+        int voltas = Math.max(1, props.getVoltasNaCadeia());
+        Set<String> descartados = new HashSet<>();
 
+        for (int volta = 1; volta <= voltas; volta++) {
+            if (volta > 1) {
+                if (prazoFinal - System.nanoTime() <= 0 || descartados.size() >= candidatos.size()) break;
+                System.out.println("[LLM] Todos os modelos falharam; nova volta na cadeia (" + volta + "/" + voltas + ")");
+            }
+            Resposta r = percorrerCadeia(candidatos, requisicao, prazoFinal, tentativas, descartados);
+            if (r != null) {
+                return new Resultado(r, tentativas, (System.nanoTime() - inicio) / 1_000_000L);
+            }
+        }
+        return new Resultado(null, tentativas, (System.nanoTime() - inicio) / 1_000_000L);
+    }
+
+    /**
+     * Uma volta na cadeia: tenta cada modelo que ainda não teve falha definitiva.
+     * Cada tentativa é registrada em {@code tentativas}; a ordem é a posição nessa lista.
+     *
+     * @return a resposta do primeiro modelo que deu certo, ou null se todos falharam
+     */
+    private Resposta percorrerCadeia(List<LlmProvider> candidatos, Requisicao requisicao, long prazoFinal,
+                                     List<Tentativa> tentativas, Set<String> descartados) {
         for (LlmProvider provider : candidatos) {
+            if (descartados.contains(provider.nomeConfig())) continue;
             int maxTentativas = Math.max(1, props.getTentativasPorModelo());
             for (int t = 1; t <= maxTentativas; t++) {
-                ordem++;
+                int ordem = tentativas.size() + 1;
                 long restanteMs = (prazoFinal - System.nanoTime()) / 1_000_000L;
                 if (restanteMs <= 0 || !aguardarVez(provider, restanteMs)) {
                     tentativas.add(new Tentativa(ordem, provider.nomeConfig(), provider.provedor(), provider.modelo(),
@@ -120,23 +148,27 @@ public class LlmRouter {
                     tentativas.add(new Tentativa(ordem, provider.nomeConfig(), r.provedor(), r.modelo(),
                             true, null, null, lat, r.tokensEntrada(), r.tokensSaida()));
                     System.out.println("[LLM] OK " + provider.nomeConfig() + " em " + lat + " ms");
-                    return new Resultado(r, tentativas, (System.nanoTime() - inicio) / 1_000_000L);
+                    return r;
                 } catch (LlmException e) {
                     long lat = (System.nanoTime() - t0) / 1_000_000L;
                     tentativas.add(new Tentativa(ordem, provider.nomeConfig(), provider.provedor(), provider.modelo(),
                             false, e.getMotivo(), resumir(e.getMessage()), lat, null, null));
                     System.err.println("[LLM] Falha " + provider.nomeConfig() + " (" + e.getMotivo() + "): " + resumir(e.getMessage()));
-                    if (!e.temporaria()) break; // falha definitiva neste modelo: vai para o próximo
+                    if (!e.temporaria()) { // falha definitiva neste modelo: não volta a ele
+                        descartados.add(provider.nomeConfig());
+                        break;
+                    }
                 } catch (RuntimeException e) {
                     long lat = (System.nanoTime() - t0) / 1_000_000L;
                     tentativas.add(new Tentativa(ordem, provider.nomeConfig(), provider.provedor(), provider.modelo(),
                             false, MotivoFalha.DESCONHECIDO, resumir(String.valueOf(e)), lat, null, null));
                     System.err.println("[LLM] Erro inesperado em " + provider.nomeConfig() + ": " + e);
+                    descartados.add(provider.nomeConfig());
                     break;
                 }
             }
         }
-        return new Resultado(null, tentativas, (System.nanoTime() - inicio) / 1_000_000L);
+        return null;
     }
 
     /**
