@@ -273,6 +273,16 @@ class ConversaJavaTest {
         assertTrue(prompt.contains("desenvolva a própria ideia"), "A: desenvolver a resposta parcial");
         assertTrue(prompt.contains("`synchronized (objeto) { ... }`"), "forma geral da sintaxe");
         assertTrue(prompt.contains("Só nomear um recurso"), "onde e por quê");
+        // Revisão 4
+        assertTrue(prompt.contains("no máximo uma vez na conversa"), "executar só uma vez");
+        assertTrue(prompt.contains("nunca é FORA_DO_TEMA nem PEDIU_SOLUCAO"), "dúvida conceitual");
+        assertTrue(prompt.contains("Nunca repita uma mensagem"), "sem mensagens repetidas");
+        assertTrue(prompt.contains("garante a ordem em que as threads"), "equívocos comuns");
+        assertTrue(prompt.contains("não peça que ele execute o programa antes"), "correção aceita sem executar antes");
+        // Revisão 5
+        assertTrue(prompt.contains("Nunca copie linhas do código"), "linhas numeradas, sem copiar");
+        assertTrue(prompt.contains("essa parte é o aluno quem descobre"), "nível 3 só com a estratégia");
+        assertTrue(prompt.contains("sem asteriscos"), "texto simples");
     }
 
     @Test

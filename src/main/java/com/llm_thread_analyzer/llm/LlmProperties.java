@@ -44,8 +44,14 @@ public class LlmProperties {
     /** Tentativas no mesmo modelo para falhas temporárias (503, timeout) antes de passar ao próximo. */
     private int tentativasPorModelo = 1;
 
+    /**
+     * Quantas vezes percorrer a cadeia inteira. Com 2, se todos os modelos falharem por motivo temporário
+     * (por exemplo, 503 "high demand" nos dois ao mesmo tempo), a cadeia é tentada de novo enquanto houver prazo.
+     */
+    private int voltasNaCadeia = 1;
+
     public static class Modelo {
-        /** "gemini" ou "openai" (qualquer API compatível com /chat/completions: Groq, OpenRouter, etc.). */
+        /** "gemini", "anthropic" (Claude) ou "openai" (qualquer API compatível com /chat/completions: Groq, OpenRouter, etc.). */
         private String tipo = "gemini";
         /** Identificador do modelo no provedor, ex.: gemini-2.5-flash. */
         private String modelo;
@@ -61,6 +67,13 @@ public class LlmProperties {
         private Integer thinkingBudget;
         /** Gemini 3.x em diante: nível de "thinking" (minimal, low, medium, high). Tem prioridade sobre thinkingBudget. */
         private String thinkingLevel;
+        /** Só Claude: "thinking" ligado (true) ou desligado (false, respostas mais rápidas). Vazio = padrão do modelo. */
+        private Boolean pensar;
+        /** Nível de esforço de raciocínio (low, medium, high): Claude (effort) e modelos com raciocínio
+         *  na API compatível com OpenAI (reasoning_effort, ex.: gpt-oss na Groq). Vazio = padrão do modelo. */
+        private String esforco;
+        /** Só API compatível com OpenAI: true = response_format json_schema estrito (o provedor precisa aceitar). */
+        private boolean esquemaEstrito;
 
         public String getTipo() { return tipo; }
         public void setTipo(String tipo) { this.tipo = tipo; }
@@ -80,6 +93,12 @@ public class LlmProperties {
         public void setThinkingBudget(Integer thinkingBudget) { this.thinkingBudget = thinkingBudget; }
         public String getThinkingLevel() { return thinkingLevel; }
         public void setThinkingLevel(String thinkingLevel) { this.thinkingLevel = thinkingLevel; }
+        public Boolean getPensar() { return pensar; }
+        public void setPensar(Boolean pensar) { this.pensar = pensar; }
+        public String getEsforco() { return esforco; }
+        public void setEsforco(String esforco) { this.esforco = esforco; }
+        public boolean isEsquemaEstrito() { return esquemaEstrito; }
+        public void setEsquemaEstrito(boolean esquemaEstrito) { this.esquemaEstrito = esquemaEstrito; }
     }
 
     public List<String> getCadeia() { return cadeia; }
@@ -95,5 +114,7 @@ public class LlmProperties {
     public long getPrazoTotalMs() { return prazoTotalMs; }
     public void setPrazoTotalMs(long prazoTotalMs) { this.prazoTotalMs = prazoTotalMs; }
     public int getTentativasPorModelo() { return tentativasPorModelo; }
+    public int getVoltasNaCadeia() { return voltasNaCadeia; }
+    public void setVoltasNaCadeia(int voltasNaCadeia) { this.voltasNaCadeia = voltasNaCadeia; }
     public void setTentativasPorModelo(int tentativasPorModelo) { this.tentativasPorModelo = tentativasPorModelo; }
 }

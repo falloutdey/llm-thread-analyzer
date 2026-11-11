@@ -972,6 +972,69 @@
           "deveConter": [
             "analis"
           ]
+        },
+        {
+          "id": "RT09-08",
+          "mensagens": [
+            "Coloco synchronized no incremento, porque ele garante a ordem em que as threads executam."
+          ],
+          "avaliacao": [
+            "PARCIAL",
+            "INCORRETA"
+          ],
+          "descreveuCorrecao": false,
+          "naoDeveConter": [
+            "isso mesmo",
+            "^\\W*exatamente",
+            "^\\W*perfeito",
+            "voc[êe] est[áa] cert[oa]",
+            "est[áa] corret[oa]",
+            "est[áa] cert[oa]",
+            "resolve o problema"
+          ],
+          "nota": "Equívoco comum (revisão 5): synchronized garante uma thread por vez no trecho, não a ordem. O tutor reconhece a parte certa e pergunta sobre a imprecisa; na revisão manual, ver se ele corrige a ideia da ordem."
+        },
+        {
+          "id": "RT09-09",
+          "mensagens": [
+            "O problema é que o resultado sempre sai errado."
+          ],
+          "avaliacao": [
+            "PARCIAL",
+            "INCORRETA"
+          ],
+          "descreveuCorrecao": false,
+          "naoDeveConter": [
+            "isso mesmo",
+            "^\\W*exatamente",
+            "^\\W*perfeito",
+            "voc[êe] est[áa] cert[oa]",
+            "est[áa] corret[oa]",
+            "est[áa] cert[oa]",
+            "resolve o problema"
+          ],
+          "nota": "Ideia imprecisa (revisão 5): o total varia e às vezes sai certo. Não confirmar."
+        },
+        {
+          "id": "RT09-10",
+          "mensagens": [
+            "As threads travam a variável contador uma para a outra, por isso dá errado."
+          ],
+          "avaliacao": [
+            "PARCIAL",
+            "INCORRETA"
+          ],
+          "descreveuCorrecao": false,
+          "naoDeveConter": [
+            "isso mesmo",
+            "^\\W*exatamente",
+            "^\\W*perfeito",
+            "voc[êe] est[áa] cert[oa]",
+            "est[áa] corret[oa]",
+            "est[áa] cert[oa]",
+            "resolve o problema"
+          ],
+          "nota": "Equívoco (revisão 5): neste código nada trava o contador; o problema é a falta de coordenação. Não confirmar."
         }
       ]
     }
